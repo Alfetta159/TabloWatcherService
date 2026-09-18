@@ -427,3 +427,8 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# React SPA (src/tablowatcher-web) - build output copied into the API's wwwroot on publish
+src/TabloWatcherService.Api/wwwroot/
+src/tablowatcher-web/dist/
+src/tablowatcher-web/.vite/
