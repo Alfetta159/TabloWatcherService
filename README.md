@@ -9,7 +9,11 @@ process to run and one port to open — no reverse proxy required. The SPA calls
 API same-origin, so no CORS configuration is needed outside of local development.
 
 - [src/TabloWatcherService.Api](src/TabloWatcherService.Api) — ASP.NET Core Web API + static file host
-- [src/tablowatcher-web](src/tablowatcher-web) — React SPA (Vite, TypeScript)
+- [src/tablowatcher-web](src/tablowatcher-web) — React SPA (Vite, TypeScript, Tailwind CSS, shadcn/ui)
+
+New UI components come from shadcn/ui: `npx shadcn@latest add <component>` from
+`src/tablowatcher-web` (see [components.json](src/tablowatcher-web/components.json)
+for the configured style/aliases).
 
 The API binds to `0.0.0.0:5080` by default (see `Kestrel:Endpoints:Http:Url` in
 [appsettings.json](src/TabloWatcherService.Api/appsettings.json)), so it's reachable

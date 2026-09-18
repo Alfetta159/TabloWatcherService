@@ -1,9 +1,17 @@
+import path from 'node:path'
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      // Matches the "@/*" path in tsconfig.app.json - required by shadcn/ui components.
+      '@': path.resolve(import.meta.dirname, './src'),
+    },
+  },
   build: {
     // Built assets land directly in the API project's wwwroot, so ASP.NET Core
     // can serve the SPA and the REST API from the same host/port.
