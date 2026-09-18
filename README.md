@@ -18,9 +18,35 @@ firewall rules if that's more exposure than you want.
 
 ## Local development
 
-Run the API and the Vite dev server side by side — Vite proxies `/api/*` requests
-to the API (see [vite.config.ts](src/tablowatcher-web/vite.config.ts)), so you get
-hot-reload on the frontend without CORS.
+### Option 1: one command (SpaProxy)
+
+VS Code: run `npm install` once in `src/tablowatcher-web`, then use the
+**Launch API + SPA (SpaProxy)** configuration in [.vscode/launch.json](.vscode/launch.json)
+(Run and Debug panel, or F5). It builds and starts the API, which in turn
+launches `npm run dev` for you if it isn't already running, and opens
+`http://localhost:5080` in your browser.
+
+From the command line it's the same underlying behavior — just run the API:
+
+```bash
+cd src/tablowatcher-web && npm install   # once
+cd ../TabloWatcherService.Api
+dotnet run
+```
+
+Browsing to `http://localhost:5080` will redirect you to the live Vite dev
+server (with hot-reload) — this comes from the `Microsoft.AspNetCore.SpaProxy`
+package referenced in [TabloWatcherService.Api.csproj](src/TabloWatcherService.Api/TabloWatcherService.Api.csproj)
+and activated via `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES` in
+[launchSettings.json](src/TabloWatcherService.Api/Properties/launchSettings.json).
+If you already have `npm run dev` running in another terminal, SpaProxy detects
+it and reuses it instead of starting a second instance.
+
+### Option 2: run both yourself
+
+Equivalent, just more explicit about what's running where — Vite proxies
+`/api/*` requests to the API (see [vite.config.ts](src/tablowatcher-web/vite.config.ts)),
+so you get hot-reload on the frontend without CORS either way.
 
 ```bash
 # terminal 1 - API on http://localhost:5080
@@ -33,7 +59,7 @@ npm install
 npm run dev
 ```
 
-Browse to `http://localhost:5173` during development.
+Browse to `http://localhost:5173` directly during development.
 
 ## Building for production
 

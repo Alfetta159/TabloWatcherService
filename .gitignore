@@ -428,7 +428,12 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-# React SPA (src/tablowatcher-web) - build output copied into the API's wwwroot on publish
-src/TabloWatcherService.Api/wwwroot/
+# React SPA (src/tablowatcher-web) - build output copied into the API's wwwroot on publish.
+# The wwwroot folder itself must still exist on disk (kept via .gitkeep) even with nothing
+# built into it yet: ASP.NET Core's static web assets manifest points at it unconditionally,
+# and WebApplicationBuilder.CreateBuilder() throws DirectoryNotFoundException at startup if
+# the directory is missing entirely.
+src/TabloWatcherService.Api/wwwroot/*
+!src/TabloWatcherService.Api/wwwroot/.gitkeep
 src/tablowatcher-web/dist/
 src/tablowatcher-web/.vite/
