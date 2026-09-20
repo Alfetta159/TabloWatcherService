@@ -1,3 +1,7 @@
+using System.Text.Json;
+using Refit;
+using TabloWatcherService.Api.Services.Tablo;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Lets the app run as a Linux systemd service or a Windows Service when hosted that way;
@@ -6,6 +10,26 @@ builder.Host.UseSystemd();
 builder.Host.UseWindowsService();
 
 builder.Services.AddOpenApi();
+builder.Services.AddControllers();
+
+// Refit 16 generates the client implementation at compile time by default (no runtime
+// reflection/codegen); AddRefitGeneratedClient wires up that generated implementation.
+// The association server's JSON fields are snake_case (e.g. "public_ip").
+var tabloJsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+tabloJsonOptions.Converters.Add(new TabloDateTimeConverter());
+var tabloRefitSettings = new RefitSettings(new SystemTextJsonContentSerializer(tabloJsonOptions));
+
+builder.Services
+    .AddRefitGeneratedClient<IAssociationServerClient>(tabloRefitSettings)
+    .ConfigureHttpClient(client =>
+        client.BaseAddress = new Uri(builder.Configuration["Tablo:AssociationServerBaseUrl"]!));
+
+// Points at a single Tablo device's own local API. See appsettings.json - update
+// Tablo:DeviceBaseUrl to your device's host:port (from GET /api/servers).
+builder.Services
+    .AddRefitGeneratedClient<ITabloDeviceClient>(tabloRefitSettings)
+    .ConfigureHttpClient(client =>
+        client.BaseAddress = new Uri(builder.Configuration["Tablo:DeviceBaseUrl"]!));
 
 var app = builder.Build();
 
@@ -13,6 +37,8 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.MapControllers();
 
 var api = app.MapGroup("/api");
 
