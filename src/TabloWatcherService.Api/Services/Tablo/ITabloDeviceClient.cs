@@ -12,4 +12,7 @@ public interface ITabloDeviceClient
 {
     [Get("/account/subscription")]
     Task<ApiResponse<SubscriptionInfo>> GetSubscriptionAsync();
+
+    [Get("/server/info")]
+    Task<ApiResponse<ServerInfo>> GetServerInfoAsync();
 }
