@@ -1,28 +1,20 @@
 using Microsoft.AspNetCore.Mvc;
+using Refit;
 using TabloWatcherService.Api.Services.Tablo;
 
 namespace TabloWatcherService.Api.Controllers;
 
-[ApiController]
 [Route("api/guide-series")]
-public class GuideSeriesController(ITabloDeviceClient tabloDeviceClient) : ControllerBase
+public class GuideSeriesController(ITabloDeviceClientFactory clientFactory) : TabloDeviceControllerBase<string[]>(clientFactory)
 {
-    [HttpGet]
-    public async Task<IActionResult> Get()
-    {
-        var response = await tabloDeviceClient.GetGuideSeriesAsync();
-        if (!response.IsSuccessStatusCode)
-        {
-            return response.ToErrorResult();
-        }
-
-        return Ok(response.Content);
-    }
+    protected override Task<ApiResponse<string[]>> GetResponseAsync(ITabloDeviceClient client) =>
+        client.GetGuideSeriesAsync();
 
     [HttpGet("{seriesId:int}")]
-    public async Task<IActionResult> GetById(int seriesId)
+    public async Task<IActionResult> GetById(int seriesId, [FromQuery] string ip, [FromQuery] int port = 8885)
     {
-        var response = await tabloDeviceClient.GetGuideSeriesByIdAsync(seriesId);
+        var client = ClientFactory.Create(ip, port);
+        var response = await client.GetGuideSeriesByIdAsync(seriesId);
         if (!response.IsSuccessStatusCode)
         {
             return response.ToErrorResult();

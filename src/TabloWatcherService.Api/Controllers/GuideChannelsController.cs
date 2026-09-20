@@ -1,28 +1,20 @@
 using Microsoft.AspNetCore.Mvc;
+using Refit;
 using TabloWatcherService.Api.Services.Tablo;
 
 namespace TabloWatcherService.Api.Controllers;
 
-[ApiController]
 [Route("api/guide-channels")]
-public class GuideChannelsController(ITabloDeviceClient tabloDeviceClient) : ControllerBase
+public class GuideChannelsController(ITabloDeviceClientFactory clientFactory) : TabloDeviceControllerBase<string[]>(clientFactory)
 {
-    [HttpGet]
-    public async Task<IActionResult> Get()
-    {
-        var response = await tabloDeviceClient.GetGuideChannelsAsync();
-        if (!response.IsSuccessStatusCode)
-        {
-            return response.ToErrorResult();
-        }
-
-        return Ok(response.Content);
-    }
+    protected override Task<ApiResponse<string[]>> GetResponseAsync(ITabloDeviceClient client) =>
+        client.GetGuideChannelsAsync();
 
     [HttpGet("{channelId:int}")]
-    public async Task<IActionResult> GetById(int channelId)
+    public async Task<IActionResult> GetById(int channelId, [FromQuery] string ip, [FromQuery] int port = 8885)
     {
-        var response = await tabloDeviceClient.GetGuideChannelAsync(channelId);
+        var client = ClientFactory.Create(ip, port);
+        var response = await client.GetGuideChannelAsync(channelId);
         if (!response.IsSuccessStatusCode)
         {
             return response.ToErrorResult();

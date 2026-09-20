@@ -1,21 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
+using Refit;
+using TabloWatcherService.Api.Models;
 using TabloWatcherService.Api.Services.Tablo;
 
 namespace TabloWatcherService.Api.Controllers;
 
-[ApiController]
 [Route("api/update-info")]
-public class UpdateInfoController(ITabloDeviceClient tabloDeviceClient) : ControllerBase
+public class UpdateInfoController(ITabloDeviceClientFactory clientFactory) : TabloDeviceControllerBase<UpdateInfo>(clientFactory)
 {
-    [HttpGet]
-    public async Task<IActionResult> Get()
-    {
-        var response = await tabloDeviceClient.GetUpdateInfoAsync();
-        if (!response.IsSuccessStatusCode)
-        {
-            return response.ToErrorResult();
-        }
-
-        return Ok(response.Content);
-    }
+    protected override Task<ApiResponse<UpdateInfo>> GetResponseAsync(ITabloDeviceClient client) =>
+        client.GetUpdateInfoAsync();
 }

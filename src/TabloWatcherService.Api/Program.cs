@@ -24,12 +24,14 @@ builder.Services
     .ConfigureHttpClient(client =>
         client.BaseAddress = new Uri(builder.Configuration["Tablo:AssociationServerBaseUrl"]!));
 
-// Points at a single Tablo device's own local API. See appsettings.json - update
-// Tablo:DeviceBaseUrl to your device's host:port (from GET /api/servers).
-builder.Services
-    .AddRefitGeneratedClient<ITabloDeviceClient>(tabloRefitSettings)
-    .ConfigureHttpClient(client =>
-        client.BaseAddress = new Uri(builder.Configuration["Tablo:DeviceBaseUrl"]!));
+// Unlike the association server, a Tablo device's local API has no fixed address - its
+// private_ip and http port (from GET /api/servers) vary per device, discovered at runtime
+// by the front end. So ITabloDeviceClient can't be configured with one base address at
+// startup; ITabloDeviceClientFactory builds one per request instead, from "ip"/"port" query
+// parameters the caller supplies (see TabloDeviceControllerBase).
+builder.Services.AddHttpClient(nameof(ITabloDeviceClient));
+builder.Services.AddSingleton<ITabloDeviceClientFactory>(serviceProvider =>
+    new TabloDeviceClientFactory(serviceProvider.GetRequiredService<IHttpClientFactory>(), tabloRefitSettings));
 
 var app = builder.Build();
 

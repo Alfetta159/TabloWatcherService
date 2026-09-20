@@ -1,21 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
+using Refit;
+using TabloWatcherService.Api.Models;
 using TabloWatcherService.Api.Services.Tablo;
 
 namespace TabloWatcherService.Api.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public class TunersController(ITabloDeviceClient tabloDeviceClient) : ControllerBase
+public class TunersController(ITabloDeviceClientFactory clientFactory) : TabloDeviceControllerBase<Tuner[]>(clientFactory)
 {
-    [HttpGet]
-    public async Task<IActionResult> Get()
-    {
-        var response = await tabloDeviceClient.GetTunersAsync();
-        if (!response.IsSuccessStatusCode)
-        {
-            return response.ToErrorResult();
-        }
-
-        return Ok(response.Content);
-    }
+    protected override Task<ApiResponse<Tuner[]>> GetResponseAsync(ITabloDeviceClient client) =>
+        client.GetTunersAsync();
 }

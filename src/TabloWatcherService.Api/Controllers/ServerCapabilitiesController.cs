@@ -1,21 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
+using Refit;
+using TabloWatcherService.Api.Models;
 using TabloWatcherService.Api.Services.Tablo;
 
 namespace TabloWatcherService.Api.Controllers;
 
-[ApiController]
 [Route("api/server-capabilities")]
-public class ServerCapabilitiesController(ITabloDeviceClient tabloDeviceClient) : ControllerBase
+public class ServerCapabilitiesController(ITabloDeviceClientFactory clientFactory) : TabloDeviceControllerBase<ServerCapabilities>(clientFactory)
 {
-    [HttpGet]
-    public async Task<IActionResult> Get()
-    {
-        var response = await tabloDeviceClient.GetServerCapabilitiesAsync();
-        if (!response.IsSuccessStatusCode)
-        {
-            return response.ToErrorResult();
-        }
-
-        return Ok(response.Content);
-    }
+    protected override Task<ApiResponse<ServerCapabilities>> GetResponseAsync(ITabloDeviceClient client) =>
+        client.GetServerCapabilitiesAsync();
 }

@@ -1,21 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
+using Refit;
+using TabloWatcherService.Api.Models;
 using TabloWatcherService.Api.Services.Tablo;
 
 namespace TabloWatcherService.Api.Controllers;
 
-[ApiController]
 [Route("api/guide-status")]
-public class GuideStatusController(ITabloDeviceClient tabloDeviceClient) : ControllerBase
+public class GuideStatusController(ITabloDeviceClientFactory clientFactory) : TabloDeviceControllerBase<GuideStatus>(clientFactory)
 {
-    [HttpGet]
-    public async Task<IActionResult> Get()
-    {
-        var response = await tabloDeviceClient.GetGuideStatusAsync();
-        if (!response.IsSuccessStatusCode)
-        {
-            return response.ToErrorResult();
-        }
-
-        return Ok(response.Content);
-    }
+    protected override Task<ApiResponse<GuideStatus>> GetResponseAsync(ITabloDeviceClient client) =>
+        client.GetGuideStatusAsync();
 }
