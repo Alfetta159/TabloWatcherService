@@ -1,4 +1,3 @@
-using Refit;
 using TabloWatcherService.Api.Models;
 
 namespace TabloWatcherService.Api.Services.Tablo;

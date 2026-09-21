@@ -1,5 +1,3 @@
-using System.Text.Json;
-using Refit;
 using TabloWatcherService.Api.Services.Tablo;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,8 +32,15 @@ builder.Services
 // parameters the caller supplies (see TabloDeviceControllerBase).
 // The device's local API rejects requests without a User-Agent header (403 "Request
 // forbidden by administrative rules"), which HttpClient doesn't send by default.
-builder.Services.AddHttpClient(nameof(ITabloDeviceClient), client =>
+var tabloDeviceClientBuilder = builder.Services.AddHttpClient(nameof(ITabloDeviceClient), client =>
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TabloWatcherService/1.0"));
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddTransient<TabloRequestLoggingHandler>();
+    tabloDeviceClientBuilder.AddHttpMessageHandler<TabloRequestLoggingHandler>();
+}
+
 builder.Services.AddSingleton<ITabloDeviceClientFactory>(serviceProvider =>
     new TabloDeviceClientFactory(serviceProvider.GetRequiredService<IHttpClientFactory>(), tabloRefitSettings));
 

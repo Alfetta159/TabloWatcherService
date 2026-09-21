@@ -1,11 +1,10 @@
-using Microsoft.AspNetCore.Mvc;
-using Refit;
+using TabloWatcherService.Api.Models;
 using TabloWatcherService.Api.Services.Tablo;
 
 namespace TabloWatcherService.Api.Controllers;
 
 [Route("api/guide-series")]
-public class GuideSeriesController(ITabloDeviceClientFactory clientFactory) : TabloDeviceControllerBase<string[]>(clientFactory)
+public class GuideSeriesController(ITabloDeviceClientFactory clientFactory) : TabloDeviceControllerBase<string[],GuideSeries>(clientFactory)
 {
     protected override Task<ApiResponse<string[]>> GetResponseAsync(ITabloDeviceClient client) =>
         client.GetGuideSeriesAsync();
@@ -21,5 +20,10 @@ public class GuideSeriesController(ITabloDeviceClientFactory clientFactory) : Ta
         }
 
         return Ok(response.Content);
+    }
+
+    protected override Task<ApiResponse<IDictionary<string, GuideSeries>>> PostBatchAsync(ITabloDeviceClient client, IEnumerable<string> paths)
+    {
+        throw new NotImplementedException();
     }
 }

@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
 using TabloWatcherService.Api.Services.Tablo;
 
 namespace TabloWatcherService.Api.Controllers;

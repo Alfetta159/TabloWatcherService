@@ -1,5 +1,3 @@
-using Refit;
-
 namespace TabloWatcherService.Api.Services.Tablo;
 
 public class TabloDeviceClientFactory(IHttpClientFactory httpClientFactory, RefitSettings refitSettings) : ITabloDeviceClientFactory

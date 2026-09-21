@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
-using Refit;
 using TabloWatcherService.Api.Services.Tablo;
 
 namespace TabloWatcherService.Api.Controllers;
@@ -11,17 +9,31 @@ namespace TabloWatcherService.Api.Controllers;
 /// <see cref="ITabloDeviceClientFactory"/>.
 /// </summary>
 [ApiController]
-public abstract class TabloDeviceControllerBase<TResponse>(ITabloDeviceClientFactory clientFactory) : ControllerBase
+public abstract class TabloDeviceControllerBase<TResponse,TBatchResponse>(ITabloDeviceClientFactory clientFactory) : ControllerBase
 {
     protected ITabloDeviceClientFactory ClientFactory { get; } = clientFactory;
 
     protected abstract Task<ApiResponse<TResponse>> GetResponseAsync(ITabloDeviceClient client);
+    protected abstract Task<ApiResponse<IDictionary<string, TBatchResponse>>> PostBatchAsync(ITabloDeviceClient client, IEnumerable<string> paths);
 
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string ip, [FromQuery] int port = 8885)
     {
         var client = ClientFactory.Create(ip, port);
         var response = await GetResponseAsync(client);
+        if (!response.IsSuccessStatusCode)
+        {
+            return response.ToErrorResult();
+        }
+
+        return Ok(response.Content);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> PostBatch([FromQuery] string ip, [FromBody] IEnumerable<string> paths, [FromQuery] int port = 8885)
+    {
+        var client = ClientFactory.Create(ip, port);
+        var response = await PostBatchAsync(client, paths);
         if (!response.IsSuccessStatusCode)
         {
             return response.ToErrorResult();

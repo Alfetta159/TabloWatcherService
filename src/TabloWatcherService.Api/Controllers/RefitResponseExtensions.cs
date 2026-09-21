@@ -1,6 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
-using Refit;
-
 namespace TabloWatcherService.Api.Controllers;
 
 public static class RefitResponseExtensions

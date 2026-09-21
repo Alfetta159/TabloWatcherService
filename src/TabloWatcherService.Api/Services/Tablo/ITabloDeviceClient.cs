@@ -1,4 +1,3 @@
-using Refit;
 using TabloWatcherService.Api.Models;
 
 namespace TabloWatcherService.Api.Services.Tablo;
@@ -36,6 +35,9 @@ public interface ITabloDeviceClient
 
     [Get("/guide/channels")]
     Task<ApiResponse<string[]>> GetGuideChannelsAsync();
+
+    [Post("/batch")]
+    Task<ApiResponse<IDictionary<string, T>>> PostBatchAsync<T>([Body] IEnumerable<string> paths) where T : class;
 
     [Get("/guide/channels/{channelId}")]
     Task<ApiResponse<GuideChannel>> GetGuideChannelAsync(int channelId);
