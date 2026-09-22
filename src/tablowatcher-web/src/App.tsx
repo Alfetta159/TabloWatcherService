@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { GuideGrid } from '@/components/GuideGrid'
 
 interface WeatherForecast {
   date: string
@@ -183,7 +184,13 @@ function App() {
           ))}
         </aside>
 
-        <main className="mx-auto w-full max-w-2xl flex-1 space-y-6 overflow-y-auto p-6">
+        <main
+          className={
+            selectedNav === 'Live TV'
+              ? 'flex-1 space-y-6 overflow-y-auto p-6'
+              : 'mx-auto w-full max-w-2xl flex-1 space-y-6 overflow-y-auto p-6'
+          }
+        >
         {selectedNav === 'Live TV' ? (
           <div className="flex h-full min-h-0 flex-col gap-4">
             <Card className="min-h-0 flex-1">
@@ -196,26 +203,14 @@ function App() {
             </Card>
 
             <Card className="min-h-0 flex-[3] overflow-hidden">
-              <CardHeader>
-                <CardTitle>Channels</CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 space-y-2 overflow-y-auto">
-                {channelsError && (
-                  <Alert variant="destructive">
-                    <AlertTitle>Couldn't reach the API</AlertTitle>
-                    <AlertDescription>/api/guide-channels returned an error: {channelsError}</AlertDescription>
-                  </Alert>
-                )}
-                {channelsLoading && <p className="text-muted-foreground text-sm">Loading channels…</p>}
-                {channels.map((c) => (
-                  <div key={c.objectId} className="flex items-center justify-between text-sm">
-                    <span>{c.channel.name}</span>
-                    <Badge variant="secondary">
-                      {c.channel.major}.{c.channel.minor}
-                    </Badge>
-                  </div>
-                ))}
-              </CardContent>
+              {channelsError && (
+                <Alert variant="destructive" className="m-4">
+                  <AlertTitle>Couldn't reach the API</AlertTitle>
+                  <AlertDescription>/api/guide-channels returned an error: {channelsError}</AlertDescription>
+                </Alert>
+              )}
+              {channelsLoading && <p className="text-muted-foreground p-4 text-sm">Loading channels…</p>}
+              <GuideGrid />
             </Card>
           </div>
         ) : (
