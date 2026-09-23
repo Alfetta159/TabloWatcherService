@@ -15,8 +15,7 @@ namespace TabloWatcherService.Api.Services.Tablo;
 /// chunks still fail transiently, hence the retry in <see cref="ChunkedBatchAsync"/>.
 /// </summary>
 public class AiringsRefreshService(
-    IAssociationServerClient associationServerClient,
-    ITabloDeviceClientFactory clientFactory,
+    ICurrentTabloDeviceResolver deviceResolver,
     IAiringsStore store,
     IConfiguration configuration,
     ILogger<AiringsRefreshService> logger) : BackgroundService
@@ -25,10 +24,6 @@ public class AiringsRefreshService(
     private const int MaxConcurrentBatches = 1;
     private const int RetryCount = 2;
     private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(500);
-
-    // The association server's cached "http" port for a device can be stale (see
-    // ServerInfoController history); 8885 is the Tablo local API's actual port.
-    private const int DevicePort = 8885;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -51,31 +46,22 @@ public class AiringsRefreshService(
 
     private async Task RefreshAsync(CancellationToken cancellationToken)
     {
-        var recordersResponse = await associationServerClient.GetRecordersAsync();
-        if (!recordersResponse.IsSuccessStatusCode)
-        {
-            logger.LogWarning("Couldn't reach the association server: {Status}", recordersResponse.StatusCode);
-            return;
-        }
-
-        var recorder = recordersResponse.Content?.Recorders.FirstOrDefault();
-        if (recorder is null)
+        var client = await deviceResolver.ResolveAsync();
+        if (client is null)
         {
             logger.LogWarning("No Tablo servers registered; skipping guide grid refresh");
             return;
         }
 
-        var client = clientFactory.Create(recorder.PrivateIp, DevicePort);
-
         var pathsResponse = await client.GetGuideAiringsAsync();
         if (!pathsResponse.IsSuccessStatusCode || pathsResponse.Content is null)
         {
-            logger.LogWarning("Couldn't fetch guide airings from {Server}: {Status}", recorder.Name, pathsResponse.StatusCode);
+            logger.LogWarning("Couldn't fetch guide airings: {Status}", pathsResponse.StatusCode);
             return;
         }
 
         var paths = pathsResponse.Content;
-        logger.LogInformation("Found {Count} airing paths on {Server}", paths.Length, recorder.Name);
+        logger.LogInformation("Found {Count} airing paths", paths.Length);
 
         var (airings, failedChunks) = await ChunkedBatchAsync(client, paths, cancellationToken);
         store.Replace(airings);

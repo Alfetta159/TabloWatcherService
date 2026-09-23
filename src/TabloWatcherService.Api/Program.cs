@@ -51,6 +51,10 @@ if (builder.Environment.IsDevelopment())
 builder.Services.AddSingleton<ITabloDeviceClientFactory>(serviceProvider =>
     new TabloDeviceClientFactory(serviceProvider.GetRequiredService<IHttpClientFactory>(), tabloRefitSettings));
 
+// Resolves "the" Tablo device (the first the association server knows about) for
+// features scoped to a single device: the guide grid and its background images.
+builder.Services.AddSingleton<ICurrentTabloDeviceResolver, CurrentTabloDeviceResolver>();
+
 // Guide grid (channels x time): AiringsRefreshService periodically rebuilds this
 // in-memory store from the Tablo device; GuideGridController just reads it.
 builder.Services.AddSingleton<IAiringsStore, AiringsStore>();

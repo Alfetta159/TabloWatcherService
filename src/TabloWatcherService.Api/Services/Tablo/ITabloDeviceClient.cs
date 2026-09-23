@@ -65,4 +65,9 @@ public interface ITabloDeviceClient
 
     [Get("/guide/shows")]
     Task<ApiResponse<string[]>> GetGuideShowsAsync();
+
+    // Raw HttpResponseMessage, not ApiResponse<T>: this returns an image (e.g. image/jpeg),
+    // not JSON, so it bypasses the configured JSON content serializer entirely.
+    [Get("/images/{imageId}")]
+    Task<HttpResponseMessage> GetImageAsync(int imageId);
 }

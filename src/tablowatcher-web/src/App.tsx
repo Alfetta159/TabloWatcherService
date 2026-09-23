@@ -19,7 +19,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { GuideGrid } from '@/components/GuideGrid'
+import { GuideGrid, type SelectedProgram } from '@/components/GuideGrid'
+import { ResizableSplit } from '@/components/ResizableSplit'
 
 interface WeatherForecast {
   date: string
@@ -85,6 +86,7 @@ function App() {
   const [channels, setChannels] = useState<GuideChannel[]>([])
   const [channelsLoading, setChannelsLoading] = useState(false)
   const [channelsError, setChannelsError] = useState<string | null>(null)
+  const [selectedProgram, setSelectedProgram] = useState<SelectedProgram | null>(null)
 
   useEffect(() => {
     fetch('/api/weatherforecast')
@@ -192,27 +194,55 @@ function App() {
           }
         >
         {selectedNav === 'Live TV' ? (
-          <div className="flex h-full min-h-0 flex-col gap-4">
-            <Card className="min-h-0 flex-1">
-              <CardHeader>
-                <CardTitle>Live TV</CardTitle>
-              </CardHeader>
-              <CardContent className="text-muted-foreground text-sm">
-                {channels.length > 0 ? `${channels.length} channels available` : 'No channels loaded yet'}
-              </CardContent>
-            </Card>
-
-            <Card className="min-h-0 flex-[3] overflow-hidden">
-              {channelsError && (
-                <Alert variant="destructive" className="m-4">
-                  <AlertTitle>Couldn't reach the API</AlertTitle>
-                  <AlertDescription>/api/guide-channels returned an error: {channelsError}</AlertDescription>
-                </Alert>
-              )}
-              {channelsLoading && <p className="text-muted-foreground p-4 text-sm">Loading channels…</p>}
-              <GuideGrid />
-            </Card>
-          </div>
+          <ResizableSplit
+            className="h-full"
+            defaultTopRatio={1 / 3}
+            top={
+              <Card
+                className="relative min-h-0 flex-1 bg-cover bg-center"
+                style={
+                  selectedProgram?.backgroundImageUrl
+                    ? { backgroundImage: `url(${selectedProgram.backgroundImageUrl})` }
+                    : undefined
+                }
+              >
+                {selectedProgram?.backgroundImageUrl && (
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
+                )}
+                <CardHeader className="relative">
+                  <CardTitle className={selectedProgram?.backgroundImageUrl ? 'text-white' : undefined}>
+                    {selectedProgram ? selectedProgram.title : 'Live TV'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent
+                  className={`relative space-y-1 text-sm ${selectedProgram?.backgroundImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}
+                >
+                  <p>
+                    {selectedProgram
+                      ? selectedProgram.subtitle
+                      : channels.length > 0
+                        ? `${channels.length} channels available`
+                        : 'No channels loaded yet'}
+                  </p>
+                  {selectedProgram?.description && (
+                    <p className="line-clamp-2 text-xs opacity-80">{selectedProgram.description}</p>
+                  )}
+                </CardContent>
+              </Card>
+            }
+            bottom={
+              <Card className="min-h-0 flex-1 overflow-hidden">
+                {channelsError && (
+                  <Alert variant="destructive" className="m-4">
+                    <AlertTitle>Couldn't reach the API</AlertTitle>
+                    <AlertDescription>/api/guide-channels returned an error: {channelsError}</AlertDescription>
+                  </Alert>
+                )}
+                {channelsLoading && <p className="text-muted-foreground p-4 text-sm">Loading channels…</p>}
+                <GuideGrid onSelect={setSelectedProgram} />
+              </Card>
+            }
+          />
         ) : (
           <>
         <Alert>
