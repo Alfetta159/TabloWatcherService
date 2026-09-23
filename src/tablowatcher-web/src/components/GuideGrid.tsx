@@ -54,10 +54,43 @@ export interface SelectedProgram {
   subtitle: string
   description: string | null
   backgroundImageUrl: string | null
+  channelObjectId: number
 }
 
 function airingKey(a: GridAiring): string {
   return a.airingDetails.datetime + a.airingDetails.showTitle
+}
+
+function nowPlayingAiring(airings: GridAiring[]): GridAiring | null {
+  const now = Date.now()
+  return (
+    airings.find((a) => {
+      const start = new Date(a.airingDetails.datetime).getTime()
+      const end = start + a.airingDetails.duration * 1000
+      return start <= now && now < end
+    }) ?? null
+  )
+}
+
+function selectionForChannel(c: GridChannel): SelectedProgram {
+  const nowPlaying = nowPlayingAiring(c.airings)
+  if (nowPlaying) {
+    return {
+      title: nowPlaying.airingDetails.showTitle,
+      subtitle: describeAiring(nowPlaying, c.channel.channel.callSign),
+      description: descriptionFor(nowPlaying),
+      backgroundImageUrl: backgroundImageUrlFor(nowPlaying),
+      channelObjectId: c.channel.objectId,
+    }
+  }
+
+  return {
+    title: c.channel.channel.callSign,
+    subtitle: c.channel.channel.network,
+    description: null,
+    backgroundImageUrl: null,
+    channelObjectId: c.channel.objectId,
+  }
 }
 
 function backgroundImageUrlFor(a: GridAiring): string | null {
@@ -126,6 +159,7 @@ export function GuideGrid({ onSelect }: GuideGridProps) {
   const [data, setData] = useState<GuideGridResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null)
 
   const windowEnd = useMemo(() => new Date(windowStart.getTime() + WINDOW_MS), [windowStart])
 
@@ -229,10 +263,19 @@ export function GuideGrid({ onSelect }: GuideGridProps) {
           <div className="bg-card sticky left-0 z-10 w-32 shrink-0 border-r">
             <div className="h-8 border-b" />
             {data?.channels.map((c) => (
-              <div
+              <button
                 key={c.channel.objectId}
-                className="flex flex-col justify-center gap-0.5 border-b px-2 text-sm"
+                type="button"
+                className={
+                  'flex w-full flex-col justify-center gap-0.5 border-b px-2 text-left text-sm transition-colors ' +
+                  (c.channel.objectId === selectedChannelId ? 'bg-secondary' : 'hover:bg-muted')
+                }
                 style={{ height: ROW_HEIGHT_PX }}
+                onClick={() => {
+                  setSelectedChannelId(c.channel.objectId)
+                  setSelectedKey(null)
+                  onSelect?.(selectionForChannel(c))
+                }}
               >
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground text-xs">
@@ -241,7 +284,7 @@ export function GuideGrid({ onSelect }: GuideGridProps) {
                   <span className="truncate font-medium">{c.channel.channel.callSign}</span>
                 </div>
                 <span className="text-muted-foreground truncate text-xs">{c.channel.channel.network}</span>
-              </div>
+              </button>
             ))}
           </div>
 
@@ -279,11 +322,13 @@ export function GuideGrid({ onSelect }: GuideGridProps) {
                       title={a.airingDetails.showTitle}
                       onClick={() => {
                         setSelectedKey(key)
+                        setSelectedChannelId(c.channel.objectId)
                         onSelect?.({
                           title: a.airingDetails.showTitle,
                           subtitle: describeAiring(a, c.channel.channel.callSign),
                           description: descriptionFor(a),
                           backgroundImageUrl: backgroundImageUrlFor(a),
+                          channelObjectId: c.channel.objectId,
                         })
                       }}
                     >

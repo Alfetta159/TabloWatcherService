@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GuideGrid, type SelectedProgram } from '@/components/GuideGrid'
+import { LivePlayer } from '@/components/LivePlayer'
 import { ResizableSplit } from '@/components/ResizableSplit'
 
 interface WeatherForecast {
@@ -87,6 +88,7 @@ function App() {
   const [channelsLoading, setChannelsLoading] = useState(false)
   const [channelsError, setChannelsError] = useState<string | null>(null)
   const [selectedProgram, setSelectedProgram] = useState<SelectedProgram | null>(null)
+  const [playlistUrl, setPlaylistUrl] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/weatherforecast')
@@ -149,6 +151,30 @@ function App() {
       .finally(() => setChannelsLoading(false))
   }, [selectedNav, selectedServerId, servers])
 
+  useEffect(() => {
+    const channelObjectId = selectedProgram?.channelObjectId
+    if (channelObjectId === undefined) return
+
+    let cancelled = false
+    setPlaylistUrl(null)
+
+    fetch(`/api/watch/${channelObjectId}`, { method: 'POST' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`API returned ${res.status}`)
+        return res.json() as Promise<{ playlistUrl: string }>
+      })
+      .then((data) => {
+        if (!cancelled) setPlaylistUrl(data.playlistUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setPlaylistUrl(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedProgram?.channelObjectId])
+
   return (
     <Tabs
       value={selectedServerId}
@@ -198,36 +224,42 @@ function App() {
             className="h-full"
             defaultTopRatio={1 / 3}
             top={
-              <Card
-                className="relative min-h-0 flex-1 bg-cover bg-center"
-                style={
-                  selectedProgram?.backgroundImageUrl
-                    ? { backgroundImage: `url(${selectedProgram.backgroundImageUrl})` }
-                    : undefined
-                }
-              >
-                {selectedProgram?.backgroundImageUrl && (
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
-                )}
-                <CardHeader className="relative">
-                  <CardTitle className={selectedProgram?.backgroundImageUrl ? 'text-white' : undefined}>
-                    {selectedProgram ? selectedProgram.title : 'Live TV'}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent
-                  className={`relative space-y-1 text-sm ${selectedProgram?.backgroundImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}
+              <Card className="min-h-0 flex-1 flex-row overflow-hidden">
+                <div
+                  className="relative flex w-1/3 shrink-0 flex-col bg-cover bg-center"
+                  style={
+                    selectedProgram?.backgroundImageUrl
+                      ? { backgroundImage: `url(${selectedProgram.backgroundImageUrl})` }
+                      : undefined
+                  }
                 >
-                  <p>
-                    {selectedProgram
-                      ? selectedProgram.subtitle
-                      : channels.length > 0
-                        ? `${channels.length} channels available`
-                        : 'No channels loaded yet'}
-                  </p>
-                  {selectedProgram?.description && (
-                    <p className="line-clamp-2 text-xs opacity-80">{selectedProgram.description}</p>
+                  {selectedProgram?.backgroundImageUrl && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
                   )}
-                </CardContent>
+                  <CardHeader className="relative">
+                    <CardTitle className={selectedProgram?.backgroundImageUrl ? 'text-white' : undefined}>
+                      {selectedProgram ? selectedProgram.title : 'Live TV'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent
+                    className={`relative space-y-1 text-sm ${selectedProgram?.backgroundImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}
+                  >
+                    <p>
+                      {selectedProgram
+                        ? selectedProgram.subtitle
+                        : channels.length > 0
+                          ? `${channels.length} channels available`
+                          : 'No channels loaded yet'}
+                    </p>
+                    {selectedProgram?.description && (
+                      <p className="line-clamp-2 text-xs opacity-80">{selectedProgram.description}</p>
+                    )}
+                  </CardContent>
+                </div>
+
+                <div className="flex w-2/3 flex-1 items-center justify-center bg-black">
+                  <LivePlayer playlistUrl={playlistUrl} className="h-full w-full" />
+                </div>
               </Card>
             }
             bottom={

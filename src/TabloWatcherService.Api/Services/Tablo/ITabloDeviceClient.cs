@@ -70,4 +70,11 @@ public interface ITabloDeviceClient
     // not JSON, so it bypasses the configured JSON content serializer entirely.
     [Get("/images/{imageId}")]
     Task<HttpResponseMessage> GetImageAsync(int imageId);
+
+    // Starts (or renews) a live stream for this channel and allocates a tuner; the
+    // playlist_url it returns points directly at the device's separate streaming server
+    // (a different port than this JSON API) and is CORS-open, so the frontend plays it
+    // directly rather than through this backend.
+    [Post("/guide/channels/{channelId}/watch")]
+    Task<ApiResponse<WatchInfo>> WatchChannelAsync(int channelId);
 }
