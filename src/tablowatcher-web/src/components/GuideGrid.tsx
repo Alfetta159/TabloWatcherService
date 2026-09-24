@@ -54,7 +54,11 @@ export interface SelectedProgram {
   subtitle: string
   description: string | null
   backgroundImageUrl: string | null
-  channelObjectId: number
+}
+
+export interface WatchedChannel {
+  objectId: number
+  tuningLabel: string
 }
 
 function airingKey(a: GridAiring): string {
@@ -80,7 +84,6 @@ function selectionForChannel(c: GridChannel): SelectedProgram {
       subtitle: describeAiring(nowPlaying, c.channel.channel.callSign),
       description: descriptionFor(nowPlaying),
       backgroundImageUrl: backgroundImageUrlFor(nowPlaying),
-      channelObjectId: c.channel.objectId,
     }
   }
 
@@ -89,8 +92,14 @@ function selectionForChannel(c: GridChannel): SelectedProgram {
     subtitle: c.channel.channel.network,
     description: null,
     backgroundImageUrl: null,
-    channelObjectId: c.channel.objectId,
   }
+}
+
+// e.g. "3.2 Me-TV M*A*S*H" - what the player shows while it tunes.
+function tuningLabelFor(c: GridChannel): string {
+  const { major, minor, callSign } = c.channel.channel
+  const nowPlaying = nowPlayingAiring(c.airings)
+  return [`${major}.${minor}`, callSign, nowPlaying?.airingDetails.showTitle].filter(Boolean).join(' ')
 }
 
 function backgroundImageUrlFor(a: GridAiring): string | null {
@@ -118,7 +127,7 @@ function descriptionFor(a: GridAiring): string | null {
   return a.episode?.description || null
 }
 
-const WINDOW_HOURS = 3
+const WINDOW_HOURS = 6
 const HOUR_WIDTH_PX = 240
 const HALF_HOUR_WIDTH_PX = HOUR_WIDTH_PX / 2
 const ROW_HEIGHT_PX = 56
@@ -151,10 +160,14 @@ function formatTick(date: Date): string {
 }
 
 interface GuideGridProps {
+  // Fired for both channel and program clicks - updates the preview pane's details.
   onSelect?: (program: SelectedProgram) => void
+  // Fired only for channel-column clicks: program cells just preview what's on, without
+  // interrupting the channel already playing.
+  onWatchChannel?: (channel: WatchedChannel) => void
 }
 
-export function GuideGrid({ onSelect }: GuideGridProps) {
+export function GuideGrid({ onSelect, onWatchChannel }: GuideGridProps) {
   const [windowStart, setWindowStart] = useState(() => roundDownToHalfHour(new Date()))
   const [data, setData] = useState<GuideGridResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -275,6 +288,7 @@ export function GuideGrid({ onSelect }: GuideGridProps) {
                   setSelectedChannelId(c.channel.objectId)
                   setSelectedKey(null)
                   onSelect?.(selectionForChannel(c))
+                  onWatchChannel?.({ objectId: c.channel.objectId, tuningLabel: tuningLabelFor(c) })
                 }}
               >
                 <div className="flex items-center gap-2">
@@ -322,13 +336,11 @@ export function GuideGrid({ onSelect }: GuideGridProps) {
                       title={a.airingDetails.showTitle}
                       onClick={() => {
                         setSelectedKey(key)
-                        setSelectedChannelId(c.channel.objectId)
                         onSelect?.({
                           title: a.airingDetails.showTitle,
                           subtitle: describeAiring(a, c.channel.channel.callSign),
                           description: descriptionFor(a),
                           backgroundImageUrl: backgroundImageUrlFor(a),
-                          channelObjectId: c.channel.objectId,
                         })
                       }}
                     >

@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { GuideGrid, type SelectedProgram } from '@/components/GuideGrid'
+import { GuideGrid, type SelectedProgram, type WatchedChannel } from '@/components/GuideGrid'
 import { LivePlayer } from '@/components/LivePlayer'
 import { ResizableSplit } from '@/components/ResizableSplit'
 
@@ -88,7 +88,9 @@ function App() {
   const [channelsLoading, setChannelsLoading] = useState(false)
   const [channelsError, setChannelsError] = useState<string | null>(null)
   const [selectedProgram, setSelectedProgram] = useState<SelectedProgram | null>(null)
+  const [watchedChannel, setWatchedChannel] = useState<WatchedChannel | null>(null)
   const [playlistUrl, setPlaylistUrl] = useState<string | null>(null)
+  const [tuneError, setTuneError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/weatherforecast')
@@ -152,11 +154,12 @@ function App() {
   }, [selectedNav, selectedServerId, servers])
 
   useEffect(() => {
-    const channelObjectId = selectedProgram?.channelObjectId
+    const channelObjectId = watchedChannel?.objectId
     if (channelObjectId === undefined) return
 
     let cancelled = false
     setPlaylistUrl(null)
+    setTuneError(null)
 
     fetch(`/api/watch/${channelObjectId}`, { method: 'POST' })
       .then((res) => {
@@ -166,14 +169,14 @@ function App() {
       .then((data) => {
         if (!cancelled) setPlaylistUrl(data.playlistUrl)
       })
-      .catch(() => {
-        if (!cancelled) setPlaylistUrl(null)
+      .catch((err) => {
+        if (!cancelled) setTuneError(err.message)
       })
 
     return () => {
       cancelled = true
     }
-  }, [selectedProgram?.channelObjectId])
+  }, [watchedChannel?.objectId])
 
   return (
     <Tabs
@@ -222,11 +225,11 @@ function App() {
         {selectedNav === 'Live TV' ? (
           <ResizableSplit
             className="h-full"
-            defaultTopRatio={1 / 3}
+            defaultTopRatio={1 / 2}
             top={
-              <Card className="min-h-0 flex-1 flex-row overflow-hidden">
+              <Card className="min-h-0 flex-1 flex-row overflow-hidden py-0">
                 <div
-                  className="relative flex w-1/3 shrink-0 flex-col bg-cover bg-center"
+                  className="relative flex w-1/3 shrink-0 flex-col gap-2 bg-cover bg-center pt-(--card-spacing)"
                   style={
                     selectedProgram?.backgroundImageUrl
                       ? { backgroundImage: `url(${selectedProgram.backgroundImageUrl})` }
@@ -234,15 +237,17 @@ function App() {
                   }
                 >
                   {selectedProgram?.backgroundImageUrl && (
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/20" />
                   )}
                   <CardHeader className="relative">
-                    <CardTitle className={selectedProgram?.backgroundImageUrl ? 'text-white' : undefined}>
+                    <CardTitle
+                      className={`text-[2rem] leading-tight ${selectedProgram?.backgroundImageUrl ? 'text-white text-shadow-lg/60' : ''}`}
+                    >
                       {selectedProgram ? selectedProgram.title : 'Live TV'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent
-                    className={`relative space-y-1 text-sm ${selectedProgram?.backgroundImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}
+                    className={`relative space-y-1 text-sm ${selectedProgram?.backgroundImageUrl ? 'text-white/90 text-shadow-md/60' : 'text-muted-foreground'}`}
                   >
                     <p>
                       {selectedProgram
@@ -252,13 +257,20 @@ function App() {
                           : 'No channels loaded yet'}
                     </p>
                     {selectedProgram?.description && (
-                      <p className="line-clamp-2 text-xs opacity-80">{selectedProgram.description}</p>
+                      <p className="line-clamp-2 text-2xl opacity-80">{selectedProgram.description}</p>
                     )}
                   </CardContent>
                 </div>
 
                 <div className="flex w-2/3 flex-1 items-center justify-center bg-black">
-                  <LivePlayer playlistUrl={playlistUrl} className="h-full w-full" />
+                  <LivePlayer
+                    // Remount per channel so playback/error state starts fresh on each tune.
+                    key={watchedChannel?.objectId}
+                    playlistUrl={playlistUrl}
+                    tuningLabel={watchedChannel?.tuningLabel ?? null}
+                    tuneError={tuneError}
+                    className="h-full w-full"
+                  />
                 </div>
               </Card>
             }
@@ -271,7 +283,7 @@ function App() {
                   </Alert>
                 )}
                 {channelsLoading && <p className="text-muted-foreground p-4 text-sm">Loading channels…</p>}
-                <GuideGrid onSelect={setSelectedProgram} />
+                <GuideGrid onSelect={setSelectedProgram} onWatchChannel={setWatchedChannel} />
               </Card>
             }
           />
