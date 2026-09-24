@@ -12,19 +12,36 @@ public interface ICurrentTabloDeviceResolver
 
 public class CurrentTabloDeviceResolver(
     IAssociationServerClient associationServerClient,
-    ITabloDeviceClientFactory clientFactory) : ICurrentTabloDeviceResolver
+    ITabloDeviceClientFactory clientFactory,
+    ILogger<CurrentTabloDeviceResolver> logger) : ICurrentTabloDeviceResolver
 {
     // The association server's cached "http" port for a device can be stale (see
     // ServerInfoController history); 8885 is the Tablo local API's actual port.
     private const int DevicePort = 8885;
 
+    // The association server rate-limits (429) aggressively; a device's private IP rarely
+    // changes, so the last one seen is a better answer than none when the lookup fails.
+    private string? _lastKnownIp;
+
     public async Task<ITabloDeviceClient?> ResolveAsync()
     {
         var recordersResponse = await associationServerClient.GetRecordersAsync();
-        var recorder = recordersResponse.IsSuccessStatusCode
-            ? recordersResponse.Content?.Recorders.FirstOrDefault()
-            : null;
+        if (recordersResponse.IsSuccessStatusCode)
+        {
+            _lastKnownIp = recordersResponse.Content?.Recorders.FirstOrDefault()?.PrivateIp;
+            if (_lastKnownIp is null)
+            {
+                logger.LogWarning("The association server returned no Tablo servers");
+            }
+        }
+        else
+        {
+            logger.LogWarning(
+                "Association server lookup failed ({Status}); {Fallback}",
+                recordersResponse.StatusCode,
+                _lastKnownIp is null ? "no previously known device to fall back to" : $"falling back to {_lastKnownIp}");
+        }
 
-        return recorder is null ? null : clientFactory.Create(recorder.PrivateIp, DevicePort);
+        return _lastKnownIp is null ? null : clientFactory.Create(_lastKnownIp, DevicePort);
     }
 }

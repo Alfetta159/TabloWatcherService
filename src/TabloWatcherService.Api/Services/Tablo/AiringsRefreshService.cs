@@ -25,39 +25,50 @@ public class AiringsRefreshService(
     private const int RetryCount = 2;
     private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(500);
 
+    // After a failed refresh (e.g. the association server rate-limiting us at startup),
+    // try again soon rather than leaving the guide empty for a whole refresh interval.
+    private static readonly TimeSpan FailedRefreshRetryInterval = TimeSpan.FromMinutes(1);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var interval = TimeSpan.FromMinutes(configuration.GetValue("Tablo:AiringsRefreshIntervalMinutes", 15));
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var succeeded = false;
             try
             {
-                await RefreshAsync(stoppingToken);
+                succeeded = await RefreshAsync(stoppingToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Failed to refresh the guide grid");
             }
 
-            await Task.Delay(interval, stoppingToken);
+            var delay = succeeded ? interval : FailedRefreshRetryInterval;
+            if (!succeeded)
+            {
+                logger.LogInformation("Retrying guide grid refresh in {Delay}", delay);
+            }
+
+            await Task.Delay(delay, stoppingToken);
         }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task<bool> RefreshAsync(CancellationToken cancellationToken)
     {
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            logger.LogWarning("No Tablo servers registered; skipping guide grid refresh");
-            return;
+            logger.LogWarning("Couldn't resolve a Tablo device; skipping guide grid refresh");
+            return false;
         }
 
         var pathsResponse = await client.GetGuideAiringsAsync();
         if (!pathsResponse.IsSuccessStatusCode || pathsResponse.Content is null)
         {
             logger.LogWarning("Couldn't fetch guide airings: {Status}", pathsResponse.StatusCode);
-            return;
+            return false;
         }
 
         var paths = pathsResponse.Content;
@@ -71,6 +82,7 @@ public class AiringsRefreshService(
             airings.Count,
             airings.Select(a => a.AiringDetails.Channel.ObjectId).Distinct().Count(),
             failedChunks);
+        return true;
     }
 
     private static async Task<(List<Airing> Airings, int FailedChunks)> ChunkedBatchAsync(
