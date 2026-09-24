@@ -312,6 +312,23 @@ function App() {
                       <p className="line-clamp-2 text-2xl opacity-80">{selectedProgram.description}</p>
                     )}
                   </CardContent>
+                  {selectedProgram?.thumbnailImageUrl && (
+                    // Takes whatever height is left under the text (so it never covers it) and
+                    // grows as the preview pane is dragged taller.
+                    <div className="relative flex min-h-0 flex-1 items-end px-(--card-spacing) pt-3 pb-(--card-spacing)">
+                      <img
+                        // Keyed so a poster that failed to load (404 - none on the device)
+                        // doesn't stay hidden for the next selection.
+                        key={selectedProgram.thumbnailImageUrl}
+                        src={selectedProgram.thumbnailImageUrl}
+                        alt=""
+                        className="h-full max-h-60 w-auto rounded-md shadow-lg ring-1 ring-white/20"
+                        onError={(e) => {
+                          e.currentTarget.hidden = true
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex w-2/3 flex-1 items-center justify-center bg-black">

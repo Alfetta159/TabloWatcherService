@@ -54,6 +54,7 @@ export interface SelectedProgram {
   subtitle: string
   description: string | null
   backgroundImageUrl: string | null
+  thumbnailImageUrl: string | null
 }
 
 export interface WatchedChannel {
@@ -84,6 +85,7 @@ function selectionForChannel(c: GridChannel): SelectedProgram {
       subtitle: describeAiring(nowPlaying, c.channel.channel.callSign),
       description: descriptionFor(nowPlaying),
       backgroundImageUrl: backgroundImageUrlFor(nowPlaying),
+      thumbnailImageUrl: thumbnailImageUrlFor(nowPlaying),
     }
   }
 
@@ -92,6 +94,7 @@ function selectionForChannel(c: GridChannel): SelectedProgram {
     subtitle: c.channel.channel.network,
     description: null,
     backgroundImageUrl: null,
+    thumbnailImageUrl: null,
   }
 }
 
@@ -102,10 +105,19 @@ function tuningLabelFor(c: GridChannel): string {
   return [`${major}.${minor}`, callSign, nowPlaying?.airingDetails.showTitle].filter(Boolean).join(' ')
 }
 
-function backgroundImageUrlFor(a: GridAiring): string | null {
-  if (a.moviePath) return `/api/images/background?moviePath=${encodeURIComponent(a.moviePath)}`
-  if (a.seriesPath) return `/api/images/background?seriesPath=${encodeURIComponent(a.seriesPath)}`
+function artworkUrlFor(kind: 'background' | 'thumbnail', a: GridAiring): string | null {
+  if (a.moviePath) return `/api/images/${kind}?moviePath=${encodeURIComponent(a.moviePath)}`
+  if (a.seriesPath) return `/api/images/${kind}?seriesPath=${encodeURIComponent(a.seriesPath)}`
   return null
+}
+
+function backgroundImageUrlFor(a: GridAiring): string | null {
+  return artworkUrlFor('background', a)
+}
+
+// The series/movie poster (portrait, usually with the title on it).
+function thumbnailImageUrlFor(a: GridAiring): string | null {
+  return artworkUrlFor('thumbnail', a)
 }
 
 function describeAiring(a: GridAiring, channelName: string): string {
@@ -371,6 +383,7 @@ export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }
                           subtitle: describeAiring(a, c.channel.channel.callSign),
                           description: descriptionFor(a),
                           backgroundImageUrl: backgroundImageUrlFor(a),
+                          thumbnailImageUrl: thumbnailImageUrlFor(a),
                         })
                       }}
                     >

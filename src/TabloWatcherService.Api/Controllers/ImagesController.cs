@@ -1,3 +1,4 @@
+using TabloWatcherService.Api.Models;
 using TabloWatcherService.Api.Services.Tablo;
 
 namespace TabloWatcherService.Api.Controllers;
@@ -33,11 +34,22 @@ public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : Cont
     }
 
     // A movie/series airing only carries a path back to its movie or series (see
-    // Airing.MoviePath/SeriesPath) - the background image id lives on that separate
-    // object, so resolving "the backdrop for this airing" takes an extra device call
-    // before we even know which image to fetch.
+    // Airing.MoviePath/SeriesPath) - the image ids live on that separate object, so
+    // resolving "the backdrop/thumbnail for this airing" takes an extra device call before
+    // we even know which image to fetch.
     [HttpGet("background")]
-    public async Task<IActionResult> GetBackground([FromQuery] string? moviePath, [FromQuery] string? seriesPath)
+    public Task<IActionResult> GetBackground([FromQuery] string? moviePath, [FromQuery] string? seriesPath) =>
+        RedirectToArtworkAsync(moviePath, seriesPath, m => m.BackgroundImage, s => s.BackgroundImage);
+
+    [HttpGet("thumbnail")]
+    public Task<IActionResult> GetThumbnail([FromQuery] string? moviePath, [FromQuery] string? seriesPath) =>
+        RedirectToArtworkAsync(moviePath, seriesPath, m => m.ThumbnailImage, s => s.ThumbnailImage);
+
+    private async Task<IActionResult> RedirectToArtworkAsync(
+        string? moviePath,
+        string? seriesPath,
+        Func<MovieDetails, MovieImage?> movieImage,
+        Func<SeriesDetails, MovieImage?> seriesImage)
     {
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
@@ -50,12 +62,12 @@ public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : Cont
         if (TryExtractId(moviePath, out var movieId))
         {
             var movie = await client.GetGuideMovieAsync(movieId);
-            imageId = movie.IsSuccessStatusCode ? movie.Content?.Movie.BackgroundImage?.ImageId : null;
+            imageId = movie is { IsSuccessStatusCode: true, Content: not null } ? movieImage(movie.Content.Movie)?.ImageId : null;
         }
         else if (TryExtractId(seriesPath, out var seriesId))
         {
             var series = await client.GetGuideSeriesByIdAsync(seriesId);
-            imageId = series.IsSuccessStatusCode ? series.Content?.Series.BackgroundImage?.ImageId : null;
+            imageId = series is { IsSuccessStatusCode: true, Content: not null } ? seriesImage(series.Content.Series)?.ImageId : null;
         }
 
         if (imageId is null)
