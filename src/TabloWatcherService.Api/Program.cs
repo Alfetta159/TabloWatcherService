@@ -32,8 +32,15 @@ builder.Services
 // parameters the caller supplies (see TabloDeviceControllerBase).
 // The device's local API rejects requests without a User-Agent header (403 "Request
 // forbidden by administrative rules"), which HttpClient doesn't send by default.
+// It's also a bare HTTP/1.0 server that closes the socket after every response without
+// clearly signaling it - reused pooled connections intermittently fail with "the response
+// ended prematurely" (seen hammering /batch under concurrency). ConnectionClose forces a
+// fresh connection per request, matching how curl (never seen to fail here) behaves.
 var tabloDeviceClientBuilder = builder.Services.AddHttpClient(nameof(ITabloDeviceClient), client =>
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("TabloWatcherService/1.0"));
+{
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TabloWatcherService/1.0");
+    client.DefaultRequestHeaders.ConnectionClose = true;
+});
 
 if (builder.Environment.IsDevelopment())
 {
@@ -43,6 +50,15 @@ if (builder.Environment.IsDevelopment())
 
 builder.Services.AddSingleton<ITabloDeviceClientFactory>(serviceProvider =>
     new TabloDeviceClientFactory(serviceProvider.GetRequiredService<IHttpClientFactory>(), tabloRefitSettings));
+
+// Resolves "the" Tablo device (the first the association server knows about) for
+// features scoped to a single device: the guide grid and its background images.
+builder.Services.AddSingleton<ICurrentTabloDeviceResolver, CurrentTabloDeviceResolver>();
+
+// Guide grid (channels x time): AiringsRefreshService periodically rebuilds this
+// in-memory store from the Tablo device; GuideGridController just reads it.
+builder.Services.AddSingleton<IAiringsStore, AiringsStore>();
+builder.Services.AddHostedService<AiringsRefreshService>();
 
 var app = builder.Build();
 

@@ -15,7 +15,12 @@
         // Activates Microsoft.AspNetCore.SpaProxy: on startup it launches `npm run dev`
         // (see SpaProxyLaunchCommand in TabloWatcherService.Api.csproj) unless that dev
         // server is already running on SpaProxyServerUrl, then transparently forwards to it.
-        "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": "Microsoft.AspNetCore.SpaProxy"
+        "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": "Microsoft.AspNetCore.SpaProxy",
+        // SpaProxy spawns `npm` as a raw process (no shell, no profile), so if node/npm are
+        // managed by a version manager like nvm - which only adds them to PATH via .bashrc,
+        // for interactive shells - it can't find `npm` and silently fails to start the SPA.
+        // Adjust this path to wherever `npm`/`node` actually live on your machine (`which npm`).
+        "PATH": "/home/danielprzybylski/.nvm/versions/node/v24.11.1/bin:${env:PATH}"
       },
       "serverReadyAction": {
         "pattern": "\\bNow listening on:\\s+\\S+",
