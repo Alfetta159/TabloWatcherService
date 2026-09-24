@@ -124,7 +124,7 @@ example `Tablo__AiringsRefreshIntervalMinutes=30`). For the Linux service, add t
 | `Kestrel:Endpoints:Http:Url` | `http://0.0.0.0:5080` | Address and port the app listens on |
 | `Tablo:AssociationServerBaseUrl` | `https://api.tablotv.com` | Tablo's cloud association server |
 | `Tablo:AiringsRefreshIntervalMinutes` | `15` | How often the guide is rebuilt from the device |
-| `Logging:LogLevel:System.Net.Http.HttpClient` | `Trace` | Logs every request to Tablo in detail; lower to `Warning` to quiet the logs |
+| `Logging:LogLevel:System.Net.Http.HttpClient` | `Warning` (`Trace` in Development) | How much detail to log about requests to Tablo; `Trace` logs every request |
 
 ## Building for production
 
@@ -157,6 +157,9 @@ It builds the app, creates a `tablowatcher` system user if needed, copies the bu
 and starts the service so it also starts at boot. Run it again whenever you want to update
 the service to your latest code.
 
+The service listens on port **8080** (browse to `http://<host>:8080/`), set by the unit
+file, so it can run alongside a development session on 5080.
+
 To do the same by hand:
 
 1. Build with `dotnet publish` (see above) and copy the output to `/opt/tablowatcherservice`.
@@ -181,10 +184,8 @@ journalctl -u tablowatcherservice -f
 The app calls `UseSystemd()` in [Program.cs](src/TabloWatcherService.Api/Program.cs),
 so systemd gets proper start/stop notifications and journal-integrated logging.
 
-The service and a local development session both use port 5080 by default, so only one
-can run at a time. To run both, give the service its own port by adding
-`Environment=Kestrel__Endpoints__Http__Url=http://0.0.0.0:8080` to the unit, then
-`sudo systemctl daemon-reload` and `sudo systemctl restart tablowatcherservice`.
+To use a different port, change the `Kestrel__Endpoints__Http__Url` line in the unit file
+and re-run `deploy/install.sh`.
 
 ### Windows (Windows Service)
 
@@ -206,12 +207,12 @@ just running `dotnet run`, so the same build works everywhere.
 
 ### LAN access / firewall
 
-Whichever OS you run it on, opening the service to the LAN means opening the port
-in the OS firewall:
+Whichever OS you run it on, opening the service to the LAN means opening its port
+in the OS firewall (8080 for the Linux service, 5080 by default otherwise):
 
 ```bash
 # Linux (ufw example)
-sudo ufw allow 5080/tcp
+sudo ufw allow 8080/tcp
 ```
 
 ```powershell
@@ -250,8 +251,8 @@ commented out.
 - **A channel won't play**: the browser plays the stream directly from the Tablo, so the
   device's IP must be reachable from the machine running the browser, not just from the
   server. All tuners being busy can also make tuning slow or fail.
-- **The service won't start**: another process, often a development session, may already
-  be using port 5080. Stop it or change the service's port (see above).
+- **The service won't start**: another process may already be using its port (8080 for the
+  Linux service). Stop it or change the service's port (see above).
 
 ## Tablo Legacy API
 

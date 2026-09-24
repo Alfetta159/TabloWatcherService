@@ -54,7 +54,8 @@ sudo systemctl start "$SERVICE_NAME"
 
 sleep 2
 if systemctl is-active --quiet "$SERVICE_NAME"; then
-    echo "==> $SERVICE_NAME is running."
+    port="$(grep -oP 'Http__Url=http://[^:]+:\K[0-9]+' "$UNIT_FILE" || echo 5080)"
+    echo "==> $SERVICE_NAME is running at http://$(hostname -I | awk '{print $1}'):$port"
     echo "    Logs:   journalctl -u $SERVICE_NAME -f"
     echo "    Status: systemctl status $SERVICE_NAME"
 else
