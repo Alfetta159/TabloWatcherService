@@ -3,6 +3,8 @@
 A web app for watching live TV and browsing the guide on **legacy Tablo DVR devices**,
 served from your own machine on your home network.
 
+> This application is not associated with [Tablo](https://www.tablotv.com) or Nuvyyo in any official capacity. It is an independent effort to preserve the functionality of legacy Tablo devices.
+
 ## Features
 
 ### Live TV
