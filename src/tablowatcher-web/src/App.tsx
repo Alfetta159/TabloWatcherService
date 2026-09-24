@@ -86,6 +86,11 @@ interface TunerAssignment {
 // recordings have tuned.
 const TUNERS_POLL_INTERVAL_MS = 15_000
 
+// The server list and channel list are loaded once, but either can fail transiently (the
+// association server rate-limits with 429s, or the service is mid-restart) - retry at this
+// interval until they succeed, rather than leaving the guide without rows until a reload.
+const LOAD_RETRY_INTERVAL_MS = 5_000
+
 // Records each tuner as now showing its channel. A channel's label only goes away when its
 // tuner is seen on a different channel - an idle tuner leaves the last label in place.
 function assignTuners(current: Record<number, number>, assignments: TunerAssignment[]): Record<number, number> {
@@ -144,16 +149,34 @@ function App() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/servers')
-      .then((res) => {
-        if (!res.ok) throw new Error(`API returned ${res.status}`)
-        return res.json() as Promise<Recorder[]>
-      })
-      .then((data) => {
-        setServers(data)
-        setSelectedServerId((current) => current || data[0]?.serverid || '')
-      })
-      .catch((err) => setServersError(err.message))
+    let cancelled = false
+    let retry: ReturnType<typeof setTimeout> | undefined
+
+    function load() {
+      fetch('/api/servers')
+        .then((res) => {
+          if (!res.ok) throw new Error(`API returned ${res.status}`)
+          return res.json() as Promise<Recorder[]>
+        })
+        .then((data) => {
+          if (cancelled) return
+          setServers(data)
+          setServersError(null)
+          setSelectedServerId((current) => current || data[0]?.serverid || '')
+        })
+        .catch((err) => {
+          if (cancelled) return
+          setServersError(err.message)
+          retry = setTimeout(load, LOAD_RETRY_INTERVAL_MS)
+        })
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+      clearTimeout(retry)
+    }
   }, [])
 
   useEffect(() => {
@@ -165,33 +188,52 @@ function App() {
     // server.http (from the association server's cached record) can be stale; 8885 is the
     // Tablo device's actual local-API port.
     const query = `ip=${server.privateIp}&port=8885`
+    let cancelled = false
+    let retry: ReturnType<typeof setTimeout> | undefined
     setChannelsLoading(true)
     setChannelsError(null)
 
-    fetch(`/api/guide-channels?${query}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`API returned ${res.status}`)
-        return res.json() as Promise<string[]>
-      })
-      .then((paths) =>
-        fetch(`/api/guide-channels?${query}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(paths),
-        }),
-      )
-      .then((res) => {
-        if (!res.ok) throw new Error(`API returned ${res.status}`)
-        return res.json() as Promise<Record<string, GuideChannel>>
-      })
-      .then((data) => {
-        const sorted = Object.values(data).sort(
-          (a, b) => a.channel.major - b.channel.major || a.channel.minor - b.channel.minor,
+    function load() {
+      fetch(`/api/guide-channels?${query}`)
+        .then((res) => {
+          if (!res.ok) throw new Error(`API returned ${res.status}`)
+          return res.json() as Promise<string[]>
+        })
+        .then((paths) =>
+          fetch(`/api/guide-channels?${query}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(paths),
+          }),
         )
-        setChannels(sorted)
-      })
-      .catch((err) => setChannelsError(err.message))
-      .finally(() => setChannelsLoading(false))
+        .then((res) => {
+          if (!res.ok) throw new Error(`API returned ${res.status}`)
+          return res.json() as Promise<Record<string, GuideChannel>>
+        })
+        .then((data) => {
+          const sorted = Object.values(data).sort(
+            (a, b) => a.channel.major - b.channel.major || a.channel.minor - b.channel.minor,
+          )
+          if (cancelled) return
+          setChannels(sorted)
+          setChannelsError(null)
+          setChannelsLoading(false)
+        })
+        .catch((err) => {
+          if (cancelled) return
+          // Stays "loading" while retrying; the error shows alongside so a persistent
+          // failure is still visible.
+          setChannelsError(err.message)
+          retry = setTimeout(load, LOAD_RETRY_INTERVAL_MS)
+        })
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+      clearTimeout(retry)
+    }
   }, [selectedNav, selectedServerId, servers])
 
   useEffect(() => {
