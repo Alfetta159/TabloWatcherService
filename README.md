@@ -5,6 +5,8 @@ served from your own machine on your home network.
 
 ## Features
 
+### Live TV
+
 - **Guide grid:** a six-hour channels-by-time grid, with ‹ / › to page through time and
   **Now** to jump back. Channels appear right away; programs fill in once the server has
   finished loading listings from the device.
@@ -14,7 +16,22 @@ served from your own machine on your home network.
   selected program. The split between the preview pane and the guide can be dragged.
 - **Tuner labels:** each channel that's on one of the device's tuners shows "Tuner N",
   whether this app, another Tablo client or a recording is using it.
-- The player keeps your volume and mute setting across channel changes and reloads.
+
+### Prime Time
+
+> This will probably be dropped as its value is limited and replaced with a universal search feature.
+
+### TV Shows
+
+### Movies
+
+### Sports
+
+### Schedules
+
+### Recordings
+
+### Settings
 
 ## Requirements
 
