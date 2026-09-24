@@ -1,0 +1,18 @@
+[Unit]
+Description=TabloWatcherService
+After=network.target
+
+[Service]
+Type=notify
+# Point this at wherever `dotnet publish` output was copied on this machine.
+WorkingDirectory=/opt/tablowatcherservice
+ExecStart=/usr/bin/dotnet /opt/tablowatcherservice/TabloWatcherService.Api.dll
+Restart=on-failure
+RestartSec=5
+User=tablowatcher
+Environment=ASPNETCORE_ENVIRONMENT=Production
+# Its own port, so it can run alongside a development session (which uses 5080).
+Environment=Kestrel__Endpoints__Http__Url=http://0.0.0.0:8080
+
+[Install]
+WantedBy=multi-user.target

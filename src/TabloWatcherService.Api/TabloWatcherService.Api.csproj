@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
+    <PackageReference Include="Refit" Version="16.0.0" />
+    <PackageReference Include="Refit.HttpClientFactory" Version="16.0.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <SpaRoot>..\tablowatcher-web\</SpaRoot>
+    <SpaProxyServerUrl>http://localhost:5173</SpaProxyServerUrl>
+    <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
+  </PropertyGroup>
+
+  <!-- Builds the React SPA and drops it into wwwroot so `dotnet publish` produces a
+       single self-contained deployable (API + SPA). Skipped for local `dotnet build`/`dotnet run`
+       during frontend development, where `npm run dev` (Vite) is faster to iterate against.
+       Runs AfterTargets="ComputeFilesToPublish" (rather than BeforeTargets="Publish") and adds the
+       built files to @(ResolvedFileToPublish) directly, because the wwwroot content glob that
+       normally picks up static files is evaluated before this target would otherwise run, so a
+       freshly-built wwwroot would be silently skipped. -->
+  <Target Name="BuildSpa" AfterTargets="ComputeFilesToPublish">
+    <Exec Command="npm ci" WorkingDirectory="$(SpaRoot)" Condition="!Exists('$(SpaRoot)node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
+    <ItemGroup>
+      <SpaFiles Include="wwwroot\**" />
+      <ResolvedFileToPublish Include="@(SpaFiles)">
+        <RelativePath>%(SpaFiles.Identity)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
+</Project>
