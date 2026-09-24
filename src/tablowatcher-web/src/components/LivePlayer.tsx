@@ -16,6 +16,48 @@ interface LivePlayerProps {
 // native HLS support ("maybe" from canPlayType) but its native player rejects the Tablo's
 // byte-range playlists (MEDIA_ERR_SRC_NOT_SUPPORTED). Native playback is only the fallback
 // for browsers without MSE (e.g. iOS Safari).
+interface AudioSettings {
+  volume: number
+  muted: boolean
+}
+
+// The player remounts on every channel change (see App), so the user's volume/mute choice is
+// kept here - and in localStorage, so it survives reloads too. Starts muted, like before.
+const AUDIO_STORAGE_KEY = 'livePlayer.audio'
+let audioSettings: AudioSettings = loadAudioSettings()
+
+function loadAudioSettings(): AudioSettings {
+  try {
+    const saved = JSON.parse(localStorage.getItem(AUDIO_STORAGE_KEY) ?? 'null') as Partial<AudioSettings> | null
+    if (saved && typeof saved.volume === 'number' && typeof saved.muted === 'boolean') {
+      return { volume: Math.min(1, Math.max(0, saved.volume)), muted: saved.muted }
+    }
+  } catch {
+    // Storage unavailable or corrupt - fall back to the default.
+  }
+  return { volume: 1, muted: true }
+}
+
+function saveAudioSettings(video: HTMLVideoElement) {
+  audioSettings = { volume: video.volume, muted: video.muted }
+  try {
+    localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify(audioSettings))
+  } catch {
+    // Not persisted across reloads, but still kept for this session.
+  }
+}
+
+// Unmuted autoplay can be refused (browser autoplay policy); fall back to muted rather than
+// not playing at all.
+function play(video: HTMLVideoElement) {
+  video.play().catch((err: unknown) => {
+    if (err instanceof DOMException && err.name === 'NotAllowedError' && !video.muted) {
+      video.muted = true
+      video.play().catch(() => {})
+    }
+  })
+}
+
 export function LivePlayer({ playlistUrl, tuningLabel, tuneError, className }: LivePlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -25,6 +67,9 @@ export function LivePlayer({ playlistUrl, tuningLabel, tuneError, className }: L
     const video = videoRef.current
     if (!video || !playlistUrl) return
 
+    video.volume = audioSettings.volume
+    video.muted = audioSettings.muted
+
     if (Hls.isSupported()) {
       const hls = new Hls()
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -32,7 +77,7 @@ export function LivePlayer({ playlistUrl, tuningLabel, tuneError, className }: L
       })
       hls.loadSource(playlistUrl)
       hls.attachMedia(video)
-      video.play().catch(() => {})
+      play(video)
 
       return () => hls.destroy()
     }
@@ -41,7 +86,7 @@ export function LivePlayer({ playlistUrl, tuningLabel, tuneError, className }: L
       const onError = () => setError(video.error?.message || `media error ${video.error?.code}`)
       video.addEventListener('error', onError)
       video.src = playlistUrl
-      video.play().catch(() => {})
+      play(video)
 
       return () => {
         video.removeEventListener('error', onError)
@@ -79,8 +124,8 @@ export function LivePlayer({ playlistUrl, tuningLabel, tuneError, className }: L
           className="max-h-full max-w-full"
           style={{ aspectRatio: '16 / 9' }}
           controls
-          muted
           onPlaying={() => setPlaying(true)}
+          onVolumeChange={(e) => saveAudioSettings(e.currentTarget)}
         />
       )}
       {!playing && (
