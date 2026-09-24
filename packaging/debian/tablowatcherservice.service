@@ -1,0 +1,17 @@
+[Unit]
+Description=TabloWatcherService
+After=network.target
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/tablowatcherservice
+# Self-contained publish: a native apphost binary, no `dotnet` runtime needed on the machine.
+ExecStart=/opt/tablowatcherservice/TabloWatcherService.Api
+Restart=on-failure
+RestartSec=5
+User=tablowatcher
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=Kestrel__Endpoints__Http__Url=http://0.0.0.0:8080
+
+[Install]
+WantedBy=multi-user.target

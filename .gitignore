@@ -437,3 +437,7 @@ src/TabloWatcherService.Api/wwwroot/*
 !src/TabloWatcherService.Api/wwwroot/.gitkeep
 src/tablowatcher-web/dist/
 src/tablowatcher-web/.vite/
+
+# Debian packaging (packaging/build-deb.sh) - staged publish output and built .deb files.
+packaging/staging/
+packaging/dist/
