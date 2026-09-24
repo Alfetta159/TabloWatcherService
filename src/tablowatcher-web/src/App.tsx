@@ -77,6 +77,24 @@ interface Recorder {
   relay: boolean
 }
 
+interface TunerAssignment {
+  tunerNumber: number
+  channelObjectId: number
+}
+
+// How often to re-read the device's tuners, to pick up channels other Tablo clients or
+// recordings have tuned.
+const TUNERS_POLL_INTERVAL_MS = 15_000
+
+// Records each tuner as now showing its channel. A channel's label only goes away when its
+// tuner is seen on a different channel - an idle tuner leaves the last label in place.
+function assignTuners(current: Record<number, number>, assignments: TunerAssignment[]): Record<number, number> {
+  const movedTuners = new Set(assignments.map((a) => a.tunerNumber))
+  const next = Object.fromEntries(Object.entries(current).filter(([, tuner]) => !movedTuners.has(tuner)))
+  for (const { tunerNumber, channelObjectId } of assignments) next[channelObjectId] = tunerNumber
+  return next
+}
+
 function App() {
   const [forecasts, setForecasts] = useState<WeatherForecast[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -91,6 +109,29 @@ function App() {
   const [watchedChannel, setWatchedChannel] = useState<WatchedChannel | null>(null)
   const [playlistUrl, setPlaylistUrl] = useState<string | null>(null)
   const [tuneError, setTuneError] = useState<string | null>(null)
+  // Last known tuner per channel, from this app's own tunes and the device's tuner list.
+  const [tunerByChannel, setTunerByChannel] = useState<Record<number, number>>({})
+
+  useEffect(() => {
+    let cancelled = false
+
+    function load() {
+      fetch('/api/watch/tuners')
+        .then((res) => (res.ok ? (res.json() as Promise<TunerAssignment[]>) : null))
+        .then((assignments) => {
+          if (!cancelled && assignments) setTunerByChannel((current) => assignTuners(current, assignments))
+        })
+        .catch(() => {})
+    }
+
+    load()
+    const interval = setInterval(load, TUNERS_POLL_INTERVAL_MS)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     fetch('/api/weatherforecast')
@@ -167,7 +208,18 @@ function App() {
         return res.json() as Promise<{ playlistUrl: string }>
       })
       .then((data) => {
-        if (!cancelled) setPlaylistUrl(data.playlistUrl)
+        if (cancelled) return
+        setPlaylistUrl(data.playlistUrl)
+
+        // Separate call so playback isn't held up while the device reports the tuner.
+        fetch(`/api/watch/${channelObjectId}/tuner`)
+          .then((res) => (res.ok ? (res.json() as Promise<{ tunerNumber: number | null }>) : null))
+          .then((tunerData) => {
+            const tunerNumber = tunerData?.tunerNumber
+            if (tunerNumber == null) return
+            setTunerByChannel((current) => assignTuners(current, [{ tunerNumber, channelObjectId }]))
+          })
+          .catch(() => {})
       })
       .catch((err) => {
         if (!cancelled) setTuneError(err.message)
@@ -283,7 +335,12 @@ function App() {
                   </Alert>
                 )}
                 {channelsLoading && <p className="text-muted-foreground p-4 text-sm">Loading channels…</p>}
-                <GuideGrid onSelect={setSelectedProgram} onWatchChannel={setWatchedChannel} />
+                <GuideGrid
+                  onSelect={setSelectedProgram}
+                  onWatchChannel={setWatchedChannel}
+                  tunerByChannel={tunerByChannel}
+                  channels={channels}
+                />
               </Card>
             }
           />

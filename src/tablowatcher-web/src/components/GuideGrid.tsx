@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CardContent } from '@/components/ui/card'
 
@@ -11,7 +11,7 @@ interface ChannelDetails {
   network: string
 }
 
-interface GridChannelInfo {
+export interface GridChannelInfo {
   objectId: number
   channel: ChannelDetails
 }
@@ -138,6 +138,8 @@ const WINDOW_MS = WINDOW_HOURS * 60 * 60 * 1000
 // so poll more often to pick up a fresh cache soon after it lands rather than waiting a
 // full cycle.
 const POLL_INTERVAL_MS = 60_000
+// Until the server's first airings refresh lands, check back often so listings appear promptly.
+const LOADING_POLL_INTERVAL_MS = 5_000
 
 function formatUpdatedAt(updatedAt: string): string {
   const seconds = Math.max(0, Math.round((Date.now() - new Date(updatedAt).getTime()) / 1000))
@@ -165,9 +167,14 @@ interface GuideGridProps {
   // Fired only for channel-column clicks: program cells just preview what's on, without
   // interrupting the channel already playing.
   onWatchChannel?: (channel: WatchedChannel) => void
+  // Channel object id -> the tuner last known to be showing it, shown on that channel's row.
+  tunerByChannel?: Record<number, number>
+  // The device's channel list, loaded independently of airings - shown as the rows (with no
+  // programs) until the server has finished building the guide.
+  channels?: GridChannelInfo[]
 }
 
-export function GuideGrid({ onSelect, onWatchChannel }: GuideGridProps) {
+export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }: GuideGridProps) {
   const [windowStart, setWindowStart] = useState(() => roundDownToHalfHour(new Date()))
   const [data, setData] = useState<GuideGridResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -178,6 +185,7 @@ export function GuideGrid({ onSelect, onWatchChannel }: GuideGridProps) {
 
   useEffect(() => {
     let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
 
     function load() {
       const params = new URLSearchParams({
@@ -191,19 +199,24 @@ export function GuideGrid({ onSelect, onWatchChannel }: GuideGridProps) {
           return res.json() as Promise<GuideGridResponse>
         })
         .then((d) => {
-          if (!cancelled) setData(d)
+          if (cancelled) return
+          setData(d)
+          setError(null)
+          return d
         })
         .catch((err) => {
           if (!cancelled) setError(err.message)
         })
+        .then((d) => {
+          if (!cancelled) timer = setTimeout(load, d?.updatedAt ? POLL_INTERVAL_MS : LOADING_POLL_INTERVAL_MS)
+        })
     }
 
     load()
-    const interval = setInterval(load, POLL_INTERVAL_MS)
 
     return () => {
       cancelled = true
-      clearInterval(interval)
+      clearTimeout(timer)
     }
   }, [windowStart, windowEnd])
 
@@ -234,6 +247,10 @@ export function GuideGrid({ onSelect, onWatchChannel }: GuideGridProps) {
     }
   }
 
+  const listingsLoading = !data?.updatedAt
+  const rows: GridChannel[] =
+    data?.updatedAt || !channels ? (data?.channels ?? []) : channels.map((channel) => ({ channel, airings: [] }))
+
   return (
     <>
       <div className="flex items-center justify-between border-b px-4 py-2">
@@ -242,8 +259,13 @@ export function GuideGrid({ onSelect, onWatchChannel }: GuideGridProps) {
             {windowStart.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })} &ndash;{' '}
             {windowEnd.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </span>
-          {data?.updatedAt && (
+          {data?.updatedAt ? (
             <span className="text-muted-foreground text-xs">Updated {formatUpdatedAt(data.updatedAt)}</span>
+          ) : (
+            <span className="text-muted-foreground flex items-center gap-1 self-center text-xs">
+              <LoaderCircle className="size-3 animate-spin" aria-hidden />
+              Loading listings…
+            </span>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -275,7 +297,7 @@ export function GuideGrid({ onSelect, onWatchChannel }: GuideGridProps) {
         <div className="flex w-fit">
           <div className="bg-card sticky left-0 z-10 w-32 shrink-0 border-r">
             <div className="h-8 border-b" />
-            {data?.channels.map((c) => (
+            {rows.map((c) => (
               <button
                 key={c.channel.objectId}
                 type="button"
@@ -297,7 +319,12 @@ export function GuideGrid({ onSelect, onWatchChannel }: GuideGridProps) {
                   </span>
                   <span className="truncate font-medium">{c.channel.channel.callSign}</span>
                 </div>
-                <span className="text-muted-foreground truncate text-xs">{c.channel.channel.network}</span>
+                <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate">{c.channel.channel.network}</span>
+                  {tunerByChannel?.[c.channel.objectId] !== undefined && (
+                    <span className="shrink-0">Tuner {tunerByChannel[c.channel.objectId]}</span>
+                  )}
+                </div>
               </button>
             ))}
           </div>
@@ -315,8 +342,11 @@ export function GuideGrid({ onSelect, onWatchChannel }: GuideGridProps) {
               ))}
             </div>
 
-            {data?.channels.map((c) => (
+            {rows.map((c) => (
               <div key={c.channel.objectId} className="relative border-b" style={{ height: ROW_HEIGHT_PX }}>
+                {listingsLoading && (
+                  <div className="bg-muted/60 absolute inset-x-1 top-1 bottom-1 animate-pulse rounded-md" />
+                )}
                 {c.airings.map((a) => {
                   const { left, width } = positionOf(a)
                   const key = airingKey(a)
