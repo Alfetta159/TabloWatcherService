@@ -37,7 +37,7 @@ public class SeriesDetails
     public string SeriesRating { get; set; } = string.Empty;
     public string[] Cast { get; set; } = [];
     public object[] Awards { get; set; } = [];
-    public MovieImage BackgroundImage { get; set; } = new();
-    public MovieImage CoverImage { get; set; } = new();
-    public MovieImage ThumbnailImage { get; set; } = new();
+    public MovieImage? BackgroundImage { get; set; }
+    public MovieImage? CoverImage { get; set; }
+    public MovieImage? ThumbnailImage { get; set; }
 }

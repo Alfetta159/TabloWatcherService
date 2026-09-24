@@ -22,9 +22,9 @@ public class MovieDetails
     public string[] Cast { get; set; } = [];
     public string[] Directors { get; set; } = [];
     public object[] Awards { get; set; } = [];
-    public MovieImage BackgroundImage { get; set; } = new();
-    public MovieImage CoverImage { get; set; } = new();
-    public MovieImage ThumbnailImage { get; set; } = new();
+    public MovieImage? BackgroundImage { get; set; }
+    public MovieImage? CoverImage { get; set; }
+    public MovieImage? ThumbnailImage { get; set; }
     public string[] Genres { get; set; } = [];
 }
 

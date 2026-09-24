@@ -50,12 +50,12 @@ public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : Cont
         if (TryExtractId(moviePath, out var movieId))
         {
             var movie = await client.GetGuideMovieAsync(movieId);
-            imageId = movie.IsSuccessStatusCode ? movie.Content?.Movie.BackgroundImage.ImageId : null;
+            imageId = movie.IsSuccessStatusCode ? movie.Content?.Movie.BackgroundImage?.ImageId : null;
         }
         else if (TryExtractId(seriesPath, out var seriesId))
         {
             var series = await client.GetGuideSeriesByIdAsync(seriesId);
-            imageId = series.IsSuccessStatusCode ? series.Content?.Series.BackgroundImage.ImageId : null;
+            imageId = series.IsSuccessStatusCode ? series.Content?.Series.BackgroundImage?.ImageId : null;
         }
 
         if (imageId is null)
