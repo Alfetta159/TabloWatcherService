@@ -15,7 +15,12 @@ builder.Services.AddControllers();
 // The association server's JSON fields are snake_case (e.g. "public_ip").
 var tabloJsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 tabloJsonOptions.Converters.Add(new TabloDateTimeConverter());
-var tabloRefitSettings = new RefitSettings(new SystemTextJsonContentSerializer(tabloJsonOptions));
+// Buffered: send request bodies with a Content-Length rather than streaming them chunked -
+// the device's embedded server rejects chunked bodies (e.g. POST /batch) with a 400.
+var tabloRefitSettings = new RefitSettings(new SystemTextJsonContentSerializer(tabloJsonOptions))
+{
+    Buffered = true,
+};
 
 builder.Services
     .AddRefitGeneratedClient<IAssociationServerClient>(tabloRefitSettings)
