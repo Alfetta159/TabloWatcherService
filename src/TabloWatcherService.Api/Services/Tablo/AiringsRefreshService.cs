@@ -3,9 +3,10 @@ using TabloWatcherService.Api.Models;
 namespace TabloWatcherService.Api.Services.Tablo;
 
 /// <summary>
-/// Periodically rebuilds the guide grid (<see cref="IAiringsStore"/>) from the first Tablo
-/// server the association server knows about: GET /guide/airings for the list of airing
-/// paths, then POST /batch in sequential chunks to hydrate them, mirroring the
+/// Periodically rebuilds the guide grid and search index (<see cref="IAiringsStore"/>) from
+/// the first Tablo server the association server knows about: GET /guide/airings for the
+/// list of airing paths, then POST /batch in sequential chunks to hydrate them (and then the
+/// series and movies they belong to), mirroring the
 /// tablo-legacy-m3u Python project's approach to building an EPG from the same API.
 ///
 /// Unlike that Python client, batches here run one at a time rather than a few in parallel:
@@ -74,19 +75,38 @@ public class AiringsRefreshService(
         var paths = pathsResponse.Content;
         logger.LogInformation("Found {Count} airing paths", paths.Length);
 
-        var (airings, failedChunks) = await ChunkedBatchAsync(client, paths, cancellationToken);
-        store.Replace(airings);
+        var (airings, failedChunks) = await ChunkedBatchAsync<Airing>(client, paths, cancellationToken);
+
+        // Cast lists and series/movie descriptions (for search) aren't on the airings
+        // themselves, only on the series/movie each one points back to - hydrate those too.
+        // A failed chunk here just means fewer of those fields are searchable, not a failed
+        // refresh.
+        var (series, failedSeriesChunks) = await ChunkedBatchAsync<GuideSeries>(
+            client, DistinctPaths(airings, a => a.SeriesPath), cancellationToken);
+        var (movies, failedMovieChunks) = await ChunkedBatchAsync<GuideMovie>(
+            client, DistinctPaths(airings, a => a.MoviePath), cancellationToken);
+
+        store.Replace(airings, ToDictionaryByPath(series, s => s.Path), ToDictionaryByPath(movies, m => m.Path));
 
         logger.LogInformation(
-            "Refreshed guide grid: {AiringCount} airings across {ChannelCount} channels ({FailedChunks} chunk(s) failed after retries)",
+            "Refreshed guide grid: {AiringCount} airings across {ChannelCount} channels, {SeriesCount} series, {MovieCount} movies ({FailedChunks} chunk(s) failed after retries)",
             airings.Count,
             airings.Select(a => a.AiringDetails.Channel.ObjectId).Distinct().Count(),
-            failedChunks);
+            series.Count,
+            movies.Count,
+            failedChunks + failedSeriesChunks + failedMovieChunks);
         return true;
     }
 
-    private static async Task<(List<Airing> Airings, int FailedChunks)> ChunkedBatchAsync(
+    private static string[] DistinctPaths(IEnumerable<Airing> airings, Func<Airing, string?> path) =>
+        airings.Select(path).OfType<string>().Distinct().ToArray();
+
+    private static Dictionary<string, T> ToDictionaryByPath<T>(IEnumerable<T> items, Func<T, string> path) =>
+        items.DistinctBy(path).ToDictionary(path);
+
+    private static async Task<(List<T> Items, int FailedChunks)> ChunkedBatchAsync<T>(
         ITabloDeviceClient client, IReadOnlyList<string> paths, CancellationToken cancellationToken)
+        where T : class
     {
         using var throttle = new SemaphoreSlim(MaxConcurrentBatches);
         var failedChunks = 0;
@@ -103,10 +123,10 @@ public class AiringsRefreshService(
                         await Task.Delay(RetryDelay, cancellationToken);
                     }
 
-                    ApiResponse<IDictionary<string, Airing>>? response = null;
+                    ApiResponse<IDictionary<string, T>>? response = null;
                     try
                     {
-                        response = await client.PostBatchAsync<Airing>(chunk);
+                        response = await client.PostBatchAsync<T>(chunk);
                     }
                     catch (HttpRequestException)
                     {

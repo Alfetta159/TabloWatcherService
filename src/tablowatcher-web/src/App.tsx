@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
   CalendarClock,
-  Clock,
   Disc3,
   Film,
   MonitorPlay,
   Radio,
+  Search,
   Settings,
   Trophy,
   Tv,
@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GuideGrid, type SelectedProgram, type WatchedChannel } from '@/components/GuideGrid'
 import { LivePlayer } from '@/components/LivePlayer'
 import { ResizableSplit } from '@/components/ResizableSplit'
+import { SearchPage } from '@/components/SearchPage'
 
 interface WeatherForecast {
   date: string
@@ -37,7 +38,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Live TV', icon: Tv },
-  { label: 'Prime Time', icon: Clock },
+  { label: 'Search', icon: Search },
   { label: 'TV Shows', icon: MonitorPlay },
   { label: 'Movies', icon: Film },
   { label: 'Sports', icon: Trophy },
@@ -403,6 +404,8 @@ function App() {
               </Card>
             }
           />
+        ) : selectedNav === 'Search' ? (
+          <SearchPage />
         ) : (
           <>
         <Alert>
