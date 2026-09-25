@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { LoaderCircle, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, LoaderCircle, Search } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -133,8 +133,21 @@ export function SearchPage() {
   const [response, setResponse] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set())
 
   const groups = useMemo(() => (response ? groupByShow(response.results) : []), [response])
+
+  function toggleCollapsed(key: string) {
+    setCollapsedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }
 
   function search(e: FormEvent) {
     e.preventDefault()
@@ -196,45 +209,62 @@ export function SearchPage() {
       )}
 
       {response &&
-        groups.map((group) => (
-          <Card key={group.key}>
-            <CardHeader className="space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle>{highlight(group.title, response.query)}</CardTitle>
-                <Badge variant="outline">{group.kind}</Badge>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <span className="text-muted-foreground">Matched:</span>
-                {[...group.matchedFields].map((f) => (
-                  <Badge key={f} variant="secondary">
-                    {FIELD_LABELS[f]}
-                  </Badge>
-                ))}
-                {group.matchedCast.size > 0 && (
-                  <span className="text-muted-foreground">({[...group.matchedCast].join(', ')})</span>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="divide-y text-sm">
-              {group.results.map(({ airing }) => {
-                const label = episodeLabel(airing)
-                const description = airing.episode?.description || airing.event?.description
-                return (
-                  <div key={airing.path} className="space-y-1 py-2 first:pt-0 last:pb-0">
-                    <div className="flex items-baseline justify-between gap-4">
-                      <span className="font-medium">{formatAiringTime(airing)}</span>
-                      <span className="text-muted-foreground shrink-0">{formatChannel(airing)}</span>
-                    </div>
-                    {label && <p>{highlight(label, response.query)}</p>}
-                    {description && (
-                      <p className="text-muted-foreground line-clamp-2">{highlight(description, response.query)}</p>
+        groups.map((group) => {
+          const collapsed = collapsedKeys.has(group.key)
+          return (
+            <Card key={group.key}>
+              <CardHeader className="space-y-2">
+                <button
+                  type="button"
+                  className="flex w-full items-start justify-between gap-2 text-left"
+                  onClick={() => toggleCollapsed(group.key)}
+                  aria-expanded={!collapsed}
+                >
+                  <div className="flex items-start gap-1.5">
+                    {collapsed ? (
+                      <ChevronRight className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+                    ) : (
+                      <ChevronDown className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
                     )}
+                    <CardTitle>{highlight(group.title, response.query)}</CardTitle>
                   </div>
-                )
-              })}
-            </CardContent>
-          </Card>
-        ))}
+                  <Badge variant="outline">{group.kind}</Badge>
+                </button>
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-muted-foreground">Matched:</span>
+                  {[...group.matchedFields].map((f) => (
+                    <Badge key={f} variant="secondary">
+                      {FIELD_LABELS[f]}
+                    </Badge>
+                  ))}
+                  {group.matchedCast.size > 0 && (
+                    <span className="text-muted-foreground">({[...group.matchedCast].join(', ')})</span>
+                  )}
+                </div>
+              </CardHeader>
+              {!collapsed && (
+                <CardContent className="divide-y text-sm">
+                  {group.results.map(({ airing }) => {
+                    const label = episodeLabel(airing)
+                    const description = airing.episode?.description || airing.event?.description
+                    return (
+                      <div key={airing.path} className="space-y-1 py-2 first:pt-0 last:pb-0">
+                        <div className="flex items-baseline justify-between gap-4">
+                          <span className="font-medium">{formatAiringTime(airing)}</span>
+                          <span className="text-muted-foreground shrink-0">{formatChannel(airing)}</span>
+                        </div>
+                        {label && <p>{highlight(label, response.query)}</p>}
+                        {description && (
+                          <p className="text-muted-foreground line-clamp-2">{highlight(description, response.query)}</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </CardContent>
+              )}
+            </Card>
+          )
+        })}
     </div>
   )
 }
