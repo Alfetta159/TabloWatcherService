@@ -18,7 +18,7 @@ public class MovieDetails
     public int OriginalRuntime { get; set; }
     public int ReleaseYear { get; set; }
     public string FilmRating { get; set; } = string.Empty;
-    public int QualityRating { get; set; }
+    public int? QualityRating { get; set; }
     public string[] Cast { get; set; } = [];
     public string[] Directors { get; set; } = [];
     public object[] Awards { get; set; } = [];

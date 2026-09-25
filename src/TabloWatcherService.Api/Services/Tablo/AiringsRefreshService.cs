@@ -104,7 +104,7 @@ public class AiringsRefreshService(
     private static Dictionary<string, T> ToDictionaryByPath<T>(IEnumerable<T> items, Func<T, string> path) =>
         items.DistinctBy(path).ToDictionary(path);
 
-    private static async Task<(List<T> Items, int FailedChunks)> ChunkedBatchAsync<T>(
+    private async Task<(List<T> Items, int FailedChunks)> ChunkedBatchAsync<T>(
         ITabloDeviceClient client, IReadOnlyList<string> paths, CancellationToken cancellationToken)
         where T : class
     {
@@ -124,14 +124,17 @@ public class AiringsRefreshService(
                     }
 
                     ApiResponse<IDictionary<string, T>>? response = null;
+                    Exception? error = null;
                     try
                     {
                         response = await client.PostBatchAsync<T>(chunk);
+                        error = response.Error;
                     }
-                    catch (HttpRequestException)
+                    catch (HttpRequestException ex)
                     {
                         // The device's embedded server occasionally drops a request outright
                         // (see class remarks); worth a retry rather than losing the chunk.
+                        error = ex;
                     }
 
                     if (response is { IsSuccessStatusCode: true, Content: not null })
@@ -140,6 +143,19 @@ public class AiringsRefreshService(
                         // airing that's since rolled off the guide); the device returns null
                         // for it rather than omitting the key.
                         return response.Content.Values.Where(a => a is not null).ToList()!;
+                    }
+
+                    // Includes a response that arrived but didn't deserialize into T (e.g. a
+                    // null where the model expects a value) - which fails the whole chunk, so
+                    // it's worth saying why rather than just counting it.
+                    if (attempt == RetryCount)
+                    {
+                        logger.LogWarning(
+                            error,
+                            "Batch of {Count} {Type} path(s) starting {FirstPath} failed after retries",
+                            chunk.Length,
+                            typeof(T).Name,
+                            chunk[0]);
                     }
                 }
 

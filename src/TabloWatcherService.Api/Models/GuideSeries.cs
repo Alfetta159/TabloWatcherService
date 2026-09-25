@@ -32,7 +32,7 @@ public class SeriesDetails
     public string Title { get; set; } = string.Empty;
     public string[] Genres { get; set; } = [];
     public string Description { get; set; } = string.Empty;
-    public DateOnly OrigAirDate { get; set; }
+    public DateOnly? OrigAirDate { get; set; }
     public int EpisodeRuntime { get; set; }
     public string SeriesRating { get; set; } = string.Empty;
     public string[] Cast { get; set; } = [];

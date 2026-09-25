@@ -41,7 +41,7 @@ public class MovieAiringInfo
     public string TmsId { get; set; } = string.Empty;
     public int ReleaseYear { get; set; }
     public string? FilmRating { get; set; }
-    public int QualityRating { get; set; }
+    public int? QualityRating { get; set; }
 }
 
 public class SportEventInfo
