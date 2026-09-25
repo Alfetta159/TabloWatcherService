@@ -15,7 +15,8 @@ public class TagsController(IAiringsStore airingsStore, IBlockedTagsStore blocke
 {
     // Scoped per content type - e.g. the Sports page shouldn't offer a tag that only ever
     // appears on movies - so this takes the same "kind" the frontend already keys its
-    // upcoming-list endpoint by (tv-shows/movies/sports).
+    // upcoming-list endpoint by (tv-shows/movies/sports), plus "search" for the Search page,
+    // which spans all three.
     [HttpGet]
     public IActionResult Get([FromQuery] string kind)
     {
@@ -24,12 +25,13 @@ public class TagsController(IAiringsStore airingsStore, IBlockedTagsStore blocke
             "tv-shows" => airingsStore.GetSeriesGenres(),
             "movies" => airingsStore.GetMovieGenres(),
             "sports" => airingsStore.GetSportsGenres(),
+            "search" => airingsStore.GetAllGenres(),
             _ => null,
         };
 
         if (allTags is null)
         {
-            return BadRequest("kind must be one of: tv-shows, movies, sports");
+            return BadRequest("kind must be one of: tv-shows, movies, sports, search");
         }
 
         return Ok(new { allTags, blockedTags = blockedTagsStore.Get() });

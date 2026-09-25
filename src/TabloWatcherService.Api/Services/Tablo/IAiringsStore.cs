@@ -9,9 +9,14 @@ public record ChannelAirings(GuideChannel Channel, IReadOnlyList<Airing> Airings
 
 /// <summary>
 /// One airing that matched a search, with which of its fields matched (see
-/// <see cref="SearchFields"/>) and, for a cast match, the matching cast members' names.
+/// <see cref="SearchFields"/>), for a cast match the matching cast members' names, and the
+/// genres of its series/movie/sport (for the Search page's own tag filters).
 /// </summary>
-public record AiringSearchResult(Airing Airing, IReadOnlyList<string> MatchedFields, IReadOnlyList<string> MatchedCast);
+public record AiringSearchResult(
+    Airing Airing,
+    IReadOnlyList<string> MatchedFields,
+    IReadOnlyList<string> MatchedCast,
+    IReadOnlyList<string> Genres);
 
 /// <summary>
 /// The series, movie and sport objects the guide's airings point back to (via
@@ -106,4 +111,10 @@ public interface IAiringsStore
 
     /// <summary>Likewise for sports.</summary>
     IReadOnlyList<string> GetSportsGenres();
+
+    /// <summary>
+    /// Every genre from any of the above combined, alphabetized - for the Search page, which
+    /// isn't scoped to one content type the way TV Shows/Movies/Sports are.
+    /// </summary>
+    IReadOnlyList<string> GetAllGenres();
 }

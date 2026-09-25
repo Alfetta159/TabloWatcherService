@@ -18,7 +18,8 @@ public partial class AiringsStore : IAiringsStore
         IReadOnlyList<string> Titles,
         string? EpisodeTitle,
         IReadOnlyList<string> Descriptions,
-        IReadOnlyList<(string Name, string Normalized)> Cast);
+        IReadOnlyList<(string Name, string Normalized)> Cast,
+        IReadOnlyList<string> Genres);
 
     // One series' or movie's airings (soonest first), with its series/movie object if the
     // device returned one.
@@ -126,7 +127,7 @@ public partial class AiringsStore : IAiringsStore
 
             if (matchedFields.Count > 0)
             {
-                results.Add(new AiringSearchResult(entry.Airing, matchedFields, matchedCast));
+                results.Add(new AiringSearchResult(entry.Airing, matchedFields, matchedCast, entry.Genres));
             }
         }
 
@@ -145,6 +146,12 @@ public partial class AiringsStore : IAiringsStore
     public IReadOnlyList<string> GetMovieGenres() => GenresOf(_snapshot.Movies.Select(m => m.Details?.Genres));
 
     public IReadOnlyList<string> GetSportsGenres() => GenresOf(_snapshot.SportsEvents.Select(e => e.Sport?.Genres));
+
+    public IReadOnlyList<string> GetAllGenres() =>
+        GenresOf(
+            _snapshot.Series.Select(s => s.Details?.Genres)
+                .Concat(_snapshot.Movies.Select(m => m.Details?.Genres))
+                .Concat(_snapshot.SportsEvents.Select(e => e.Sport?.Genres)));
 
     private static List<string> GenresOf(IEnumerable<string[]?> genreLists) =>
         genreLists
@@ -257,6 +264,9 @@ public partial class AiringsStore : IAiringsStore
         // episode title.
         var episodeTitle = airing.Episode?.Title ?? airing.Event?.Title;
         var cast = (series?.Cast ?? []).Concat(movie?.Cast ?? []);
+        // An airing only ever belongs to one of series/movie/sport, so only one of these is
+        // ever non-null.
+        var genres = series?.Genres ?? movie?.Genres ?? sport?.Genres ?? [];
 
         return new SearchEntry(
             airing,
@@ -268,7 +278,8 @@ public partial class AiringsStore : IAiringsStore
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(name => (name.Trim(), NormalizeWhitespace(name)))
-                .ToList());
+                .ToList(),
+            genres);
     }
 
     private static List<string> NormalizeAll(IEnumerable<string?> texts) =>

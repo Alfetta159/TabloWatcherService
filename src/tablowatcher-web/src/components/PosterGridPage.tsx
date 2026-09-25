@@ -1,17 +1,10 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
+import { TagFilterControls } from '@/components/TagFilterControls'
+import { useTagFilters } from '@/hooks/useTagFilters'
 
 // A channel as the TV shows/movies/sports endpoints return it (UpcomingResponses on the server).
 export interface ChannelInfo {
@@ -53,11 +46,6 @@ export interface PosterCardData {
 interface UpcomingResponse<T> {
   updatedAt: string | null
   items: T[]
-}
-
-interface TagsResponse {
-  allTags: string[]
-  blockedTags: string[]
 }
 
 // Like the guide grid: the server only rebuilds its cache every 15 minutes, but re-reading
@@ -161,9 +149,9 @@ export function PosterGridPage<T>({
   const [data, setData] = useState<UpcomingResponse<T> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [channelFilter, setChannelFilter] = useState(ALL_CHANNELS)
-  const [allTags, setAllTags] = useState<string[]>([])
-  const [blockedTags, setBlockedTags] = useState<Set<string>>(new Set())
-  const [showTags, setShowTags] = useState<Set<string>>(new Set())
+  // `endpoint` is already e.g. "/api/tv-shows", so it doubles as the "kind" the tags
+  // endpoint expects.
+  const tagFilters = useTagFilters(endpoint.replace(/^\/api\//, ''))
 
   useEffect(() => {
     let cancelled = false
@@ -197,84 +185,7 @@ export function PosterGridPage<T>({
     }
   }, [endpoint])
 
-  // The block list is global (shared across users), but which tags are on offer is scoped
-  // to this page's content type - e.g. Sports shouldn't offer a tag that only ever shows up
-  // on a movie. `endpoint` is already e.g. "/api/tv-shows", so it doubles as the "kind" the
-  // tags endpoint expects. Only needs to load once, not poll on the item list's cadence.
-  useEffect(() => {
-    let cancelled = false
-    const kind = endpoint.replace(/^\/api\//, '')
-
-    fetch(`/api/tags?${new URLSearchParams({ kind })}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`API returned ${res.status}`)
-        return res.json() as Promise<TagsResponse>
-      })
-      .then((d) => {
-        if (cancelled) return
-        setAllTags(d.allTags)
-        setBlockedTags(new Set(d.blockedTags))
-      })
-      .catch(() => {
-        // Non-fatal: the tag filters just come up empty: neither used to block content nor to
-        // hide anything already showing.
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [endpoint])
-
-  function toggleShowTag(tag: string) {
-    setShowTags((prev) => {
-      const next = new Set(prev)
-      if (next.has(tag)) {
-        next.delete(tag)
-      } else {
-        next.add(tag)
-      }
-      return next
-    })
-  }
-
-  // The block list is a shared, server-persisted setting (not per-browser), so every toggle
-  // writes straight through - there's no separate "save" step.
-  function toggleBlockedTag(tag: string, blocked: boolean) {
-    setBlockedTags((prev) => {
-      const next = new Set(prev)
-      if (blocked) {
-        next.add(tag)
-      } else {
-        next.delete(tag)
-      }
-
-      fetch('/api/tags/blocked', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([...next]),
-      }).catch(() => {
-        // Best-effort; the next /api/tags load will reconcile with whatever the server has.
-      })
-
-      return next
-    })
-
-    // A newly-blocked tag can no longer be a "show" filter either.
-    if (blocked) {
-      setShowTags((prev) => {
-        if (!prev.has(tag)) return prev
-        const next = new Set(prev)
-        next.delete(tag)
-        return next
-      })
-    }
-  }
-
   const cards = useMemo(() => (data?.items ?? []).map(toCard), [data, toCard])
-
-  // Tags to offer as a "show" filter - everything blocked is already gone from the item
-  // list itself, but stays listed (and checked) under "Always block" so it can be unblocked.
-  const availableTags = useMemo(() => allTags.filter((t) => !blockedTags.has(t)), [allTags, blockedTags])
 
   // Every channel any card is coming up on, for the filter.
   const channelOptions = useMemo(() => {
@@ -296,8 +207,8 @@ export function PosterGridPage<T>({
               : card.channels.filter((c) => String(c.objectId) === channelFilter),
         }))
         .filter(({ channels }) => channels.length > 0)
-        .filter(({ card }) => showTags.size === 0 || card.genres.some((g) => showTags.has(g))),
-    [cards, channelFilter, showTags],
+        .filter(({ card }) => tagFilters.includeTags.size === 0 || card.genres.some((g) => tagFilters.includeTags.has(g))),
+    [cards, channelFilter, tagFilters.includeTags],
   )
 
   const filterId = `${endpoint}-channel`
@@ -324,51 +235,7 @@ export function PosterGridPage<T>({
             </select>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Show tags</Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger className={buttonVariants({ variant: 'outline', className: 'min-w-40 justify-between' })}>
-                {showTags.size > 0 ? `${showTags.size} selected` : 'All tags'}
-                <ChevronDown className="size-4 opacity-50" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="max-h-72 overflow-y-auto">
-                {availableTags.length === 0 ? (
-                  <DropdownMenuLabel>No tags yet</DropdownMenuLabel>
-                ) : (
-                  availableTags.map((tag) => (
-                    <DropdownMenuCheckboxItem key={tag} checked={showTags.has(tag)} onCheckedChange={() => toggleShowTag(tag)}>
-                      {tag}
-                    </DropdownMenuCheckboxItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Always block</Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger className={buttonVariants({ variant: 'outline', className: 'min-w-40 justify-between' })}>
-                {blockedTags.size > 0 ? `${blockedTags.size} blocked` : 'None blocked'}
-                <ChevronDown className="size-4 opacity-50" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="max-h-72 overflow-y-auto">
-                {allTags.length === 0 ? (
-                  <DropdownMenuLabel>No tags yet</DropdownMenuLabel>
-                ) : (
-                  allTags.map((tag) => (
-                    <DropdownMenuCheckboxItem
-                      key={tag}
-                      checked={blockedTags.has(tag)}
-                      onCheckedChange={(checked) => toggleBlockedTag(tag, checked)}
-                    >
-                      {tag}
-                    </DropdownMenuCheckboxItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <TagFilterControls {...tagFilters} />
         </div>
         {data?.updatedAt && (
           <p className="text-muted-foreground text-sm">

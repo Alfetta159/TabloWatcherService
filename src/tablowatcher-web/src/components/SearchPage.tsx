@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { TagFilterControls } from '@/components/TagFilterControls'
+import { useTagFilters } from '@/hooks/useTagFilters'
 
 type MatchedField = 'title' | 'episodeTitle' | 'description' | 'cast'
 
@@ -30,6 +32,7 @@ interface SearchResult {
   airing: SearchAiring
   matchedFields: MatchedField[]
   matchedCast: string[]
+  genres: string[]
 }
 
 interface SearchResponse {
@@ -46,6 +49,7 @@ interface ShowGroup {
   kind: string
   matchedFields: Set<MatchedField>
   matchedCast: Set<string>
+  genres: Set<string>
   results: SearchResult[]
 }
 
@@ -77,12 +81,14 @@ function groupByShow(results: SearchResult[]): ShowGroup[] {
         kind: kindOf(a),
         matchedFields: new Set(),
         matchedCast: new Set(),
+        genres: new Set(),
         results: [],
       }
       groups.set(key, group)
     }
     result.matchedFields.forEach((f) => group.matchedFields.add(f))
     result.matchedCast.forEach((c) => group.matchedCast.add(c))
+    result.genres.forEach((g) => group.genres.add(g))
     group.results.push(result)
   }
   return [...groups.values()]
@@ -134,8 +140,15 @@ export function SearchPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set())
+  const tagFilters = useTagFilters('search')
 
-  const groups = useMemo(() => (response ? groupByShow(response.results) : []), [response])
+  const groups = useMemo(() => {
+    const allGroups = response ? groupByShow(response.results) : []
+    if (tagFilters.includeTags.size === 0) return allGroups
+    return allGroups.filter((g) => [...g.genres].some((genre) => tagFilters.includeTags.has(genre)))
+  }, [response, tagFilters.includeTags])
+
+  const visibleAiringCount = useMemo(() => groups.reduce((sum, g) => sum + g.results.length, 0), [groups])
 
   function toggleCollapsed(key: string) {
     setCollapsedKeys((prev) => {
@@ -184,6 +197,10 @@ export function SearchPage() {
         </Button>
       </form>
 
+      <div className="flex flex-wrap items-end gap-4">
+        <TagFilterControls {...tagFilters} />
+      </div>
+
       {error && (
         <Alert variant="destructive">
           <AlertTitle>Search failed</AlertTitle>
@@ -200,9 +217,9 @@ export function SearchPage() {
 
       {response?.updatedAt && (
         <p className="text-muted-foreground text-sm">
-          {response.totalCount === 0
+          {visibleAiringCount === 0
             ? `Nothing upcoming matches "${response.query}".`
-            : `${response.totalCount} airing${response.totalCount === 1 ? '' : 's'} of ${groups.length} show${groups.length === 1 ? '' : 's'} match "${response.query}"` +
+            : `${visibleAiringCount} airing${visibleAiringCount === 1 ? '' : 's'} of ${groups.length} show${groups.length === 1 ? '' : 's'} match "${response.query}"` +
               (response.totalCount > response.results.length ? ` (showing the first ${response.results.length})` : '') +
               '.'}
         </p>
