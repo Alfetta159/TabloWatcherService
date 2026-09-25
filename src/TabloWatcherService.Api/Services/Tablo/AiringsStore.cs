@@ -140,6 +140,17 @@ public partial class AiringsStore : IAiringsStore
     public IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now) =>
         _snapshot.SportsEvents.Where(e => HasNotEnded(e.Airing, now)).ToList();
 
+    public IReadOnlyList<string> GetAllGenres() =>
+        _snapshot.Series.Select(s => s.Details?.Genres)
+            .Concat(_snapshot.Movies.Select(m => m.Details?.Genres))
+            .Concat(_snapshot.SportsEvents.Select(e => e.Sport?.Genres))
+            .Where(genres => genres is not null)
+            .SelectMany(genres => genres!)
+            .Where(g => !string.IsNullOrWhiteSpace(g))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
     private static bool HasNotEnded(Airing airing, DateTime now) =>
         airing.AiringDetails.Datetime.AddSeconds(airing.AiringDetails.Duration) > now;
 

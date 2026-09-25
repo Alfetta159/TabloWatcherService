@@ -90,4 +90,12 @@ public interface IAiringsStore
 
     /// <summary>Sports event airings that haven't ended by <paramref name="now"/>, soonest first.</summary>
     IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now);
+
+    /// <summary>
+    /// Every genre appearing on any series, movie or sport currently in the guide,
+    /// alphabetized - regardless of whether it's blocked (see IBlockedTagsStore) or has
+    /// already aired, so a tag doesn't disappear from the filter UI just because every
+    /// airing carrying it currently happens to be blocked or in the past.
+    /// </summary>
+    IReadOnlyList<string> GetAllGenres();
 }

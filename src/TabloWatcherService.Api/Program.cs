@@ -1,3 +1,4 @@
+using TabloWatcherService.Api.Services;
 using TabloWatcherService.Api.Services.Tablo;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,6 +66,9 @@ builder.Services.AddSingleton<ICurrentTabloDeviceResolver, CurrentTabloDeviceRes
 // TV shows/movies/sports controllers just read it.
 builder.Services.AddSingleton<IAiringsStore, AiringsStore>();
 builder.Services.AddHostedService<AiringsRefreshService>();
+
+// Genre tags blocked for everyone, persisted to a small JSON file (see BlockedTagsStore).
+builder.Services.AddSingleton<IBlockedTagsStore, BlockedTagsStore>();
 
 var app = builder.Build();
 
