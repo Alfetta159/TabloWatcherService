@@ -92,10 +92,18 @@ public interface IAiringsStore
     IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now);
 
     /// <summary>
-    /// Every genre appearing on any series, movie or sport currently in the guide,
-    /// alphabetized - regardless of whether it's blocked (see IBlockedTagsStore) or has
-    /// already aired, so a tag doesn't disappear from the filter UI just because every
-    /// airing carrying it currently happens to be blocked or in the past.
+    /// Every genre appearing on any series currently in the guide, alphabetized -
+    /// regardless of whether it's blocked (see IBlockedTagsStore) or has already aired, so
+    /// a tag doesn't disappear from the filter UI just because every airing carrying it
+    /// currently happens to be blocked or in the past. Scoped to series only (not movies or
+    /// sports) so, e.g., the TV Shows page doesn't offer a tag that only ever appears on
+    /// movies.
     /// </summary>
-    IReadOnlyList<string> GetAllGenres();
+    IReadOnlyList<string> GetSeriesGenres();
+
+    /// <summary>Likewise for movies.</summary>
+    IReadOnlyList<string> GetMovieGenres();
+
+    /// <summary>Likewise for sports.</summary>
+    IReadOnlyList<string> GetSportsGenres();
 }

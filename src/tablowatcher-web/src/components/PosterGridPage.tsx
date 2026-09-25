@@ -197,12 +197,15 @@ export function PosterGridPage<T>({
     }
   }, [endpoint])
 
-  // Tags are global (shared across TV Shows/Movies/Sports and across users, not per-page),
-  // so this only needs to load once, not poll on the same cadence as the item list.
+  // The block list is global (shared across users), but which tags are on offer is scoped
+  // to this page's content type - e.g. Sports shouldn't offer a tag that only ever shows up
+  // on a movie. `endpoint` is already e.g. "/api/tv-shows", so it doubles as the "kind" the
+  // tags endpoint expects. Only needs to load once, not poll on the item list's cadence.
   useEffect(() => {
     let cancelled = false
+    const kind = endpoint.replace(/^\/api\//, '')
 
-    fetch('/api/tags')
+    fetch(`/api/tags?${new URLSearchParams({ kind })}`)
       .then((res) => {
         if (!res.ok) throw new Error(`API returned ${res.status}`)
         return res.json() as Promise<TagsResponse>
@@ -220,7 +223,7 @@ export function PosterGridPage<T>({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [endpoint])
 
   function toggleShowTag(tag: string) {
     setShowTags((prev) => {

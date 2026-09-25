@@ -13,12 +13,27 @@ namespace TabloWatcherService.Api.Controllers;
 [Route("api/tags")]
 public class TagsController(IAiringsStore airingsStore, IBlockedTagsStore blockedTagsStore) : ControllerBase
 {
+    // Scoped per content type - e.g. the Sports page shouldn't offer a tag that only ever
+    // appears on movies - so this takes the same "kind" the frontend already keys its
+    // upcoming-list endpoint by (tv-shows/movies/sports).
     [HttpGet]
-    public IActionResult Get() => Ok(new
+    public IActionResult Get([FromQuery] string kind)
     {
-        allTags = airingsStore.GetAllGenres(),
-        blockedTags = blockedTagsStore.Get(),
-    });
+        IReadOnlyList<string>? allTags = kind switch
+        {
+            "tv-shows" => airingsStore.GetSeriesGenres(),
+            "movies" => airingsStore.GetMovieGenres(),
+            "sports" => airingsStore.GetSportsGenres(),
+            _ => null,
+        };
+
+        if (allTags is null)
+        {
+            return BadRequest("kind must be one of: tv-shows, movies, sports");
+        }
+
+        return Ok(new { allTags, blockedTags = blockedTagsStore.Get() });
+    }
 
     [HttpPut("blocked")]
     public IActionResult SetBlocked([FromBody] string[] tags)

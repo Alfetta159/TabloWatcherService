@@ -140,10 +140,14 @@ public partial class AiringsStore : IAiringsStore
     public IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now) =>
         _snapshot.SportsEvents.Where(e => HasNotEnded(e.Airing, now)).ToList();
 
-    public IReadOnlyList<string> GetAllGenres() =>
-        _snapshot.Series.Select(s => s.Details?.Genres)
-            .Concat(_snapshot.Movies.Select(m => m.Details?.Genres))
-            .Concat(_snapshot.SportsEvents.Select(e => e.Sport?.Genres))
+    public IReadOnlyList<string> GetSeriesGenres() => GenresOf(_snapshot.Series.Select(s => s.Details?.Genres));
+
+    public IReadOnlyList<string> GetMovieGenres() => GenresOf(_snapshot.Movies.Select(m => m.Details?.Genres));
+
+    public IReadOnlyList<string> GetSportsGenres() => GenresOf(_snapshot.SportsEvents.Select(e => e.Sport?.Genres));
+
+    private static List<string> GenresOf(IEnumerable<string[]?> genreLists) =>
+        genreLists
             .Where(genres => genres is not null)
             .SelectMany(genres => genres!)
             .Where(g => !string.IsNullOrWhiteSpace(g))
