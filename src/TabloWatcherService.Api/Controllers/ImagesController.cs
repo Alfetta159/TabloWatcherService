@@ -30,6 +30,10 @@ public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : Cont
         var bytes = await response.Content.ReadAsByteArrayAsync();
         var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
 
+        // An image id always names the same image, so let the browser keep it rather than
+        // re-fetching through the device (e.g. every poster on the TV Shows page, each visit).
+        Response.Headers.CacheControl = "private, max-age=604800, immutable";
+
         return File(bytes, contentType);
     }
 

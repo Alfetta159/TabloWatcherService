@@ -23,6 +23,7 @@ import { GuideGrid, type SelectedProgram, type WatchedChannel } from '@/componen
 import { LivePlayer } from '@/components/LivePlayer'
 import { ResizableSplit } from '@/components/ResizableSplit'
 import { SearchPage } from '@/components/SearchPage'
+import { TvShowsPage } from '@/components/TvShowsPage'
 
 interface WeatherForecast {
   date: string
@@ -312,7 +313,7 @@ function App() {
 
         <main
           className={
-            selectedNav === 'Live TV'
+            selectedNav === 'Live TV' || selectedNav === 'TV Shows'
               ? 'flex-1 space-y-6 overflow-y-auto p-6'
               : 'mx-auto w-full max-w-2xl flex-1 space-y-6 overflow-y-auto p-6'
           }
@@ -406,6 +407,8 @@ function App() {
           />
         ) : selectedNav === 'Search' ? (
           <SearchPage />
+        ) : selectedNav === 'TV Shows' ? (
+          <TvShowsPage />
         ) : (
           <>
         <Alert>
