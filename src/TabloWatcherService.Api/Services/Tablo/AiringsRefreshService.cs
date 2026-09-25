@@ -6,7 +6,7 @@ namespace TabloWatcherService.Api.Services.Tablo;
 /// Periodically rebuilds the guide grid and search index (<see cref="IAiringsStore"/>) from
 /// the first Tablo server the association server knows about: GET /guide/airings for the
 /// list of airing paths, then POST /batch in sequential chunks to hydrate them (and then the
-/// series and movies they belong to), mirroring the
+/// series, movies and sports they belong to), mirroring the
 /// tablo-legacy-m3u Python project's approach to building an EPG from the same API.
 ///
 /// Unlike that Python client, batches here run one at a time rather than a few in parallel:
@@ -77,24 +77,30 @@ public class AiringsRefreshService(
 
         var (airings, failedChunks) = await ChunkedBatchAsync<Airing>(client, paths, cancellationToken);
 
-        // Cast lists and series/movie descriptions (for search) aren't on the airings
-        // themselves, only on the series/movie each one points back to - hydrate those too.
+        // Cast lists, artwork and series/movie/sport descriptions aren't on the airings
+        // themselves, only on the series/movie/sport each one points back to - hydrate those too.
         // A failed chunk here just means fewer of those fields are searchable, not a failed
         // refresh.
         var (series, failedSeriesChunks) = await ChunkedBatchAsync<GuideSeries>(
             client, DistinctPaths(airings, a => a.SeriesPath), cancellationToken);
         var (movies, failedMovieChunks) = await ChunkedBatchAsync<GuideMovie>(
             client, DistinctPaths(airings, a => a.MoviePath), cancellationToken);
+        var (sports, failedSportChunks) = await ChunkedBatchAsync<GuideSport>(
+            client, DistinctPaths(airings, a => a.SportPath), cancellationToken);
 
-        store.Replace(airings, ToDictionaryByPath(series, s => s.Path), ToDictionaryByPath(movies, m => m.Path));
+        store.Replace(airings, new GuideDetails(
+            ToDictionaryByPath(series, s => s.Path),
+            ToDictionaryByPath(movies, m => m.Path),
+            ToDictionaryByPath(sports, s => s.Path)));
 
         logger.LogInformation(
-            "Refreshed guide grid: {AiringCount} airings across {ChannelCount} channels, {SeriesCount} series, {MovieCount} movies ({FailedChunks} chunk(s) failed after retries)",
+            "Refreshed guide grid: {AiringCount} airings across {ChannelCount} channels, {SeriesCount} series, {MovieCount} movies, {SportCount} sports ({FailedChunks} chunk(s) failed after retries)",
             airings.Count,
             airings.Select(a => a.AiringDetails.Channel.ObjectId).Distinct().Count(),
             series.Count,
             movies.Count,
-            failedChunks + failedSeriesChunks + failedMovieChunks);
+            sports.Count,
+            failedChunks + failedSeriesChunks + failedMovieChunks + failedSportChunks);
         return true;
     }
 

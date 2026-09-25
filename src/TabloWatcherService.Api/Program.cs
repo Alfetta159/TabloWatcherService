@@ -61,8 +61,8 @@ builder.Services.AddSingleton<ITabloDeviceClientFactory>(serviceProvider =>
 builder.Services.AddSingleton<ICurrentTabloDeviceResolver, CurrentTabloDeviceResolver>();
 
 // Guide grid (channels x time): AiringsRefreshService periodically rebuilds this
-// in-memory store from the Tablo device; GuideGridController, SearchController and
-// TvShowsController just read it.
+// in-memory store from the Tablo device; GuideGridController, SearchController and the
+// TV shows/movies/sports controllers just read it.
 builder.Services.AddSingleton<IAiringsStore, AiringsStore>();
 builder.Services.AddHostedService<AiringsRefreshService>();
 

@@ -20,24 +20,25 @@ public partial class AiringsStore : IAiringsStore
         IReadOnlyList<string> Descriptions,
         IReadOnlyList<(string Name, string Normalized)> Cast);
 
-    // One series' airings (soonest first), with its series object if the device returned one.
-    private record SeriesAirings(string Path, string Title, SeriesDetails? Series, IReadOnlyList<Airing> Airings);
+    // One series' or movie's airings (soonest first), with its series/movie object if the
+    // device returned one.
+    private record TitleAirings<TDetails>(string Path, string Title, TDetails? Details, IReadOnlyList<Airing> Airings)
+        where TDetails : class;
 
     private record Snapshot(
         IReadOnlyList<ChannelAirings> Channels,
         IReadOnlyList<SearchEntry> SearchEntries,
-        IReadOnlyList<SeriesAirings> Series);
+        IReadOnlyList<TitleAirings<SeriesDetails>> Series,
+        IReadOnlyList<TitleAirings<MovieDetails>> Movies,
+        IReadOnlyList<UpcomingSportsEvent> SportsEvents);
 
     // Assigned wholesale by Replace(), never mutated in place, so a concurrent reader
     // always sees one complete, internally-consistent snapshot with no locking needed.
-    private volatile Snapshot _snapshot = new([], [], []);
+    private volatile Snapshot _snapshot = new([], [], [], [], []);
 
     public DateTimeOffset? LastUpdated { get; private set; }
 
-    public void Replace(
-        IReadOnlyList<Airing> airings,
-        IReadOnlyDictionary<string, GuideSeries> series,
-        IReadOnlyDictionary<string, GuideMovie> movies)
+    public void Replace(IReadOnlyList<Airing> airings, GuideDetails details)
     {
         var channels = airings
             .GroupBy(a => a.AiringDetails.Channel.ObjectId)
@@ -54,26 +55,23 @@ public partial class AiringsStore : IAiringsStore
             .ThenBy(a => a.AiringDetails.Channel.Channel.Minor)
             .Select(a => ToSearchEntry(
                 a,
-                a.SeriesPath is null ? null : series.GetValueOrDefault(a.SeriesPath)?.Series,
-                a.MoviePath is null ? null : movies.GetValueOrDefault(a.MoviePath)?.Movie))
+                SeriesFor(a, details),
+                MovieFor(a, details),
+                SportFor(a, details)))
             .ToList();
 
-        // Sports events can carry a series path too, but they're listed under Sports, not
-        // with TV shows.
-        var seriesAirings = airings
-            .Where(a => a.SeriesPath is not null && a.Event is null)
-            .GroupBy(a => a.SeriesPath!)
-            .Select(group =>
-            {
-                var details = series.GetValueOrDefault(group.Key)?.Series;
-                var ordered = group.OrderBy(a => a.AiringDetails.Datetime).ToList();
-                var title = string.IsNullOrWhiteSpace(details?.Title) ? ordered[0].AiringDetails.ShowTitle : details.Title;
-                return new SeriesAirings(group.Key, title, details, ordered);
-            })
-            .OrderBy(s => SortableTitle(s.Title), StringComparer.CurrentCultureIgnoreCase)
+        var seriesAirings = GroupByTitle(airings, a => a.SeriesPath, a => SeriesFor(a, details), s => s.Title);
+        var movieAirings = GroupByTitle(airings, a => a.MoviePath, a => MovieFor(a, details), m => m.Title);
+
+        var sportsEvents = airings
+            .Where(a => a.Event is not null)
+            .OrderBy(a => a.AiringDetails.Datetime)
+            .ThenBy(a => a.AiringDetails.Channel.Channel.Major)
+            .ThenBy(a => a.AiringDetails.Channel.Channel.Minor)
+            .Select(a => new UpcomingSportsEvent(a, SportFor(a, details)))
             .ToList();
 
-        _snapshot = new Snapshot(channels, searchEntries, seriesAirings);
+        _snapshot = new Snapshot(channels, searchEntries, seriesAirings, movieAirings, sportsEvents);
         LastUpdated = DateTimeOffset.UtcNow;
     }
 
@@ -135,22 +133,65 @@ public partial class AiringsStore : IAiringsStore
         return results;
     }
 
-    public IReadOnlyList<UpcomingSeries> GetUpcomingSeries(DateTime now) =>
-        _snapshot.Series
-            .Select(s => new UpcomingSeries(
-                s.Path,
-                s.Title,
-                s.Series,
-                s.Airings
-                    .Where(a => a.AiringDetails.Datetime.AddSeconds(a.AiringDetails.Duration) > now)
+    public IReadOnlyList<UpcomingTitle<SeriesDetails>> GetUpcomingSeries(DateTime now) => Upcoming(_snapshot.Series, now);
+
+    public IReadOnlyList<UpcomingTitle<MovieDetails>> GetUpcomingMovies(DateTime now) => Upcoming(_snapshot.Movies, now);
+
+    public IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now) =>
+        _snapshot.SportsEvents.Where(e => HasNotEnded(e.Airing, now)).ToList();
+
+    private static bool HasNotEnded(Airing airing, DateTime now) =>
+        airing.AiringDetails.Datetime.AddSeconds(airing.AiringDetails.Duration) > now;
+
+    private static SeriesDetails? SeriesFor(Airing airing, GuideDetails details) =>
+        airing.SeriesPath is null ? null : details.Series.GetValueOrDefault(airing.SeriesPath)?.Series;
+
+    private static MovieDetails? MovieFor(Airing airing, GuideDetails details) =>
+        airing.MoviePath is null ? null : details.Movies.GetValueOrDefault(airing.MoviePath)?.Movie;
+
+    private static SportDetails? SportFor(Airing airing, GuideDetails details) =>
+        airing.SportPath is null ? null : details.Sports.GetValueOrDefault(airing.SportPath)?.Sport;
+
+    // Groups airings by their series/movie path, sorted by title. Falls back to the airing's
+    // show title when the series/movie object is missing or untitled.
+    private static List<TitleAirings<TDetails>> GroupByTitle<TDetails>(
+        IEnumerable<Airing> airings,
+        Func<Airing, string?> path,
+        Func<Airing, TDetails?> detailsFor,
+        Func<TDetails, string> titleOf)
+        where TDetails : class =>
+        airings
+            .Where(a => path(a) is not null)
+            .GroupBy(a => path(a)!)
+            .Select(group =>
+            {
+                var ordered = group.OrderBy(a => a.AiringDetails.Datetime).ToList();
+                var details = detailsFor(ordered[0]);
+                var title = details is not null && !string.IsNullOrWhiteSpace(titleOf(details))
+                    ? titleOf(details)
+                    : ordered[0].AiringDetails.ShowTitle;
+                return new TitleAirings<TDetails>(group.Key, title, details, ordered);
+            })
+            .OrderBy(t => SortableTitle(t.Title), StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+    private static List<UpcomingTitle<TDetails>> Upcoming<TDetails>(IEnumerable<TitleAirings<TDetails>> titles, DateTime now)
+        where TDetails : class =>
+        titles
+            .Select(t => new UpcomingTitle<TDetails>(
+                t.Path,
+                t.Title,
+                t.Details,
+                t.Airings
+                    .Where(a => HasNotEnded(a, now))
                     .GroupBy(a => a.AiringDetails.Channel.ObjectId)
-                    .Select(group => new UpcomingSeriesChannel(
+                    .Select(group => new UpcomingChannel(
                         group.First().AiringDetails.Channel,
                         group.First().AiringDetails.Datetime,
                         group.Count()))
                     .OrderBy(c => c.NextAiring)
                     .ToList()))
-            .Where(s => s.Channels.Count > 0)
+            .Where(t => t.Channels.Count > 0)
             .ToList();
 
     // Sorts "The Office" with the Os, like a TV guide or library would.
@@ -188,19 +229,25 @@ public partial class AiringsStore : IAiringsStore
         return false;
     }
 
-    private static SearchEntry ToSearchEntry(Airing airing, SeriesDetails? series, MovieDetails? movie)
+    private static SearchEntry ToSearchEntry(Airing airing, SeriesDetails? series, MovieDetails? movie, SportDetails? sport)
     {
-        // The airing's own show title usually matches its series/movie title, but either can
-        // be missing (a plain program has neither), so search all that are present.
-        var titles = new[] { airing.AiringDetails.ShowTitle, series?.Title, movie?.Title };
-        var descriptions = new[] { airing.Episode?.Description, airing.Event?.Description, series?.Description, movie?.Plot };
+        // The airing's own show title usually matches its series/movie/sport title, but either
+        // can be missing (a plain program has neither), so search all that are present.
+        var titles = new[] { airing.AiringDetails.ShowTitle, series?.Title, movie?.Title, sport?.Title };
+        var descriptions = new[]
+        {
+            airing.Episode?.Description, airing.Event?.Description, series?.Description, movie?.Plot, sport?.Description,
+        };
+        // A sports event's own title (e.g. "Northwestern at Indiana") plays the part of an
+        // episode title.
+        var episodeTitle = airing.Episode?.Title ?? airing.Event?.Title;
         var cast = (series?.Cast ?? []).Concat(movie?.Cast ?? []);
 
         return new SearchEntry(
             airing,
             airing.AiringDetails.Datetime.AddSeconds(airing.AiringDetails.Duration),
             NormalizeAll(titles),
-            string.IsNullOrWhiteSpace(airing.Episode?.Title) ? null : NormalizeWhitespace(airing.Episode.Title),
+            string.IsNullOrWhiteSpace(episodeTitle) ? null : NormalizeWhitespace(episodeTitle),
             NormalizeAll(descriptions),
             cast
                 .Where(name => !string.IsNullOrWhiteSpace(name))

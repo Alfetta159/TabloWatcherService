@@ -1,36 +1,49 @@
-import { useEffect, useMemo, useState } from 'react'
-import { MonitorPlay } from 'lucide-react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 
-interface ShowChannel {
+// A channel as the TV shows/movies/sports endpoints return it (UpcomingResponses on the server).
+export interface ChannelInfo {
   objectId: number
   callSign: string
   network: string
   major: number
   minor: number
+}
+
+// A channel a title is coming up on, with its soonest airing there.
+export interface UpcomingChannel extends ChannelInfo {
   nextAiring: string
   airingCount: number
 }
 
-interface TvShow {
-  path: string
-  title: string
-  description: string | null
-  genres: string[]
-  seriesRating: string | null
+// The image ids an upcoming title carries, for GET /api/images/{id}.
+export interface Artwork {
   thumbnailImageId: number | null
   coverImageId: number | null
   backgroundImageId: number | null
-  // Sorted by soonest airing.
-  channels: ShowChannel[]
 }
 
-interface TvShowsResponse {
+export interface PosterCardData {
+  key: string
+  title: string
+  // A short line under the title, e.g. a movie's year and rating or a game's sport.
+  subtitle?: string | null
+  // Shown on hover.
+  description: string | null
+  genres: string[]
+  imageId: number | null
+  // Sorted by soonest airing.
+  channels: UpcomingChannel[]
+  // Highlighted on the poster, e.g. "Live".
+  flag?: string | null
+}
+
+interface UpcomingResponse<T> {
   updatedAt: string | null
-  shows: TvShow[]
+  items: T[]
 }
 
 // Like the guide grid: the server only rebuilds its cache every 15 minutes, but re-reading
@@ -50,23 +63,27 @@ function formatNextAiring(datetime: string): string {
   return start.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-// Prefer the portrait poster; the other images are landscape, but better than nothing.
-function posterImageId(show: TvShow): number | null {
-  return show.thumbnailImageId ?? show.coverImageId ?? show.backgroundImageId
-}
-
-function ShowCard({ show, channels }: { show: TvShow; channels: ShowChannel[] }) {
+function PosterCard({
+  card,
+  channels,
+  placeholderIcon: PlaceholderIcon,
+  showAiringCount,
+}: {
+  card: PosterCardData
+  channels: UpcomingChannel[]
+  placeholderIcon: ComponentType<{ className?: string }>
+  showAiringCount: boolean
+}) {
   const [imageFailed, setImageFailed] = useState(false)
-  const imageId = posterImageId(show)
   const next = channels[0]
   const airingCount = channels.reduce((sum, c) => sum + c.airingCount, 0)
 
   return (
-    <Card className="gap-0 overflow-hidden py-0" title={show.description ?? undefined}>
-      <div className="bg-muted flex aspect-[2/3] items-center justify-center">
-        {imageId != null && !imageFailed ? (
+    <Card className="gap-0 overflow-hidden py-0" title={card.description ?? undefined}>
+      <div className="bg-muted relative flex aspect-[2/3] items-center justify-center">
+        {card.imageId != null && !imageFailed ? (
           <img
-            src={`/api/images/${imageId}`}
+            src={`/api/images/${card.imageId}`}
             alt=""
             loading="lazy"
             className="h-full w-full object-cover"
@@ -74,25 +91,29 @@ function ShowCard({ show, channels }: { show: TvShow; channels: ShowChannel[] })
           />
         ) : (
           <div className="text-muted-foreground flex flex-col items-center gap-2 p-4 text-center text-sm">
-            <MonitorPlay className="size-8" />
-            {show.title}
+            <PlaceholderIcon className="size-8" />
+            {card.title}
           </div>
         )}
+        {card.flag && <Badge className="absolute top-2 left-2 shadow">{card.flag}</Badge>}
       </div>
       <div className="space-y-1 p-3 text-sm">
-        <p className="line-clamp-2 font-medium leading-snug">{show.title}</p>
+        <p className="line-clamp-2 font-medium leading-snug">{card.title}</p>
+        {card.subtitle && <p className="text-muted-foreground line-clamp-1 text-xs">{card.subtitle}</p>}
         <p className="text-muted-foreground">
           {formatNextAiring(next.nextAiring)}
           <br />
           {channelNumber(next)} {next.callSign}
           {channels.length > 1 && ` +${channels.length - 1} more`}
         </p>
-        <p className="text-muted-foreground text-xs">
-          {airingCount} upcoming airing{airingCount === 1 ? '' : 's'}
-        </p>
-        {show.genres.length > 0 && (
+        {showAiringCount && (
+          <p className="text-muted-foreground text-xs">
+            {airingCount} upcoming airing{airingCount === 1 ? '' : 's'}
+          </p>
+        )}
+        {card.genres.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-1">
-            {show.genres.slice(0, 2).map((g) => (
+            {card.genres.slice(0, 2).map((g) => (
               <Badge key={g} variant="secondary" className="text-xs">
                 {g}
               </Badge>
@@ -104,8 +125,26 @@ function ShowCard({ show, channels }: { show: TvShow; channels: ShowChannel[] })
   )
 }
 
-export function TvShowsPage() {
-  const [data, setData] = useState<TvShowsResponse | null>(null)
+interface PosterGridPageProps<T> {
+  // An upcoming-list endpoint returning { updatedAt, items }, already in display order.
+  endpoint: string
+  // e.g. ['show', 'shows'], for "12 shows coming up".
+  noun: [singular: string, plural: string]
+  toCard: (item: T) => PosterCardData
+  placeholderIcon: ComponentType<{ className?: string }>
+  // Off where every item is a single airing (sports events), so the count is always 1.
+  showAiringCount?: boolean
+}
+
+// A poster card per upcoming title (TV show, movie, sports event), with a channel filter.
+export function PosterGridPage<T>({
+  endpoint,
+  noun,
+  toCard,
+  placeholderIcon,
+  showAiringCount = true,
+}: PosterGridPageProps<T>) {
+  const [data, setData] = useState<UpcomingResponse<T> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [channelFilter, setChannelFilter] = useState(ALL_CHANNELS)
 
@@ -114,10 +153,10 @@ export function TvShowsPage() {
     let timer: ReturnType<typeof setTimeout> | undefined
 
     function load() {
-      fetch('/api/tv-shows')
+      fetch(endpoint)
         .then((res) => {
           if (!res.ok) throw new Error(`API returned ${res.status}`)
-          return res.json() as Promise<TvShowsResponse>
+          return res.json() as Promise<UpcomingResponse<T>>
         })
         .then((d) => {
           if (cancelled) return
@@ -139,38 +178,42 @@ export function TvShowsPage() {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [])
+  }, [endpoint])
 
-  // Every channel any show is coming up on, for the filter.
+  const cards = useMemo(() => (data?.items ?? []).map(toCard), [data, toCard])
+
+  // Every channel any card is coming up on, for the filter.
   const channelOptions = useMemo(() => {
-    const byId = new Map<number, ShowChannel>()
-    for (const show of data?.shows ?? []) for (const c of show.channels) byId.set(c.objectId, c)
+    const byId = new Map<number, ChannelInfo>()
+    for (const card of cards) for (const c of card.channels) byId.set(c.objectId, c)
     return [...byId.values()].sort((a, b) => a.major - b.major || a.minor - b.minor)
-  }, [data])
+  }, [cards])
 
-  // Each show paired with just the channels that pass the filter (so its card shows the
-  // next airing on the chosen channel), dropping shows with none.
+  // Each card paired with just the channels that pass the filter (so it shows the next
+  // airing on the chosen channel), dropping cards with none.
   const visible = useMemo(
     () =>
-      (data?.shows ?? [])
-        .map((show) => ({
-          show,
+      cards
+        .map((card) => ({
+          card,
           channels:
             channelFilter === ALL_CHANNELS
-              ? show.channels
-              : show.channels.filter((c) => String(c.objectId) === channelFilter),
+              ? card.channels
+              : card.channels.filter((c) => String(c.objectId) === channelFilter),
         }))
         .filter(({ channels }) => channels.length > 0),
-    [data, channelFilter],
+    [cards, channelFilter],
   )
+
+  const filterId = `${endpoint}-channel`
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1.5">
-          <Label htmlFor="tv-shows-channel">Channel</Label>
+          <Label htmlFor={filterId}>Channel</Label>
           <select
-            id="tv-shows-channel"
+            id={filterId}
             value={channelFilter}
             onChange={(e) => setChannelFilter(e.target.value)}
             className="border-input bg-background focus-visible:ring-ring/50 h-9 min-w-56 rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
@@ -186,7 +229,7 @@ export function TvShowsPage() {
         </div>
         {data?.updatedAt && (
           <p className="text-muted-foreground text-sm">
-            {visible.length} show{visible.length === 1 ? '' : 's'} coming up
+            {visible.length} {visible.length === 1 ? noun[0] : noun[1]} coming up
           </p>
         )}
       </div>
@@ -194,7 +237,9 @@ export function TvShowsPage() {
       {error && (
         <Alert variant="destructive">
           <AlertTitle>Couldn't reach the API</AlertTitle>
-          <AlertDescription>/api/tv-shows returned an error: {error}</AlertDescription>
+          <AlertDescription>
+            {endpoint} returned an error: {error}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -206,8 +251,14 @@ export function TvShowsPage() {
       )}
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4">
-        {visible.map(({ show, channels }) => (
-          <ShowCard key={show.path} show={show} channels={channels} />
+        {visible.map(({ card, channels }) => (
+          <PosterCard
+            key={card.key}
+            card={card}
+            channels={channels}
+            placeholderIcon={placeholderIcon}
+            showAiringCount={showAiringCount}
+          />
         ))}
       </div>
     </div>
