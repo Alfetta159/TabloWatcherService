@@ -11,35 +11,21 @@ namespace TabloWatcherService.Api.Controllers;
 public class TvShowsController(IAiringsStore store) : ControllerBase
 {
     [HttpGet]
-    public IActionResult Get()
+    public IActionResult Get() => Ok(new
     {
-        var shows = store.GetUpcomingSeries(DateTime.UtcNow);
-
-        return Ok(new
+        updatedAt = store.LastUpdated,
+        items = store.GetUpcomingSeries(DateTime.UtcNow).Select(s => new
         {
-            updatedAt = store.LastUpdated,
-            shows = shows.Select(s => new
-            {
-                path = s.Path,
-                title = s.Title,
-                description = s.Series?.Description,
-                genres = s.Series?.Genres ?? [],
-                seriesRating = s.Series?.SeriesRating,
-                // Image ids for GET /api/images/{id}; the thumbnail is the portrait poster.
-                thumbnailImageId = s.Series?.ThumbnailImage?.ImageId,
-                coverImageId = s.Series?.CoverImage?.ImageId,
-                backgroundImageId = s.Series?.BackgroundImage?.ImageId,
-                channels = s.Channels.Select(c => new
-                {
-                    objectId = c.Channel.ObjectId,
-                    callSign = c.Channel.Channel.CallSign,
-                    network = c.Channel.Channel.Network,
-                    major = c.Channel.Channel.Major,
-                    minor = c.Channel.Channel.Minor,
-                    nextAiring = c.NextAiring,
-                    airingCount = c.AiringCount,
-                }),
-            }),
-        });
-    }
+            path = s.Path,
+            title = s.Title,
+            description = s.Details?.Description,
+            genres = s.Details?.Genres ?? [],
+            seriesRating = s.Details?.SeriesRating,
+            // Image ids for GET /api/images/{id}; the thumbnail is the portrait poster.
+            thumbnailImageId = s.Details?.ThumbnailImage?.ImageId,
+            coverImageId = s.Details?.CoverImage?.ImageId,
+            backgroundImageId = s.Details?.BackgroundImage?.ImageId,
+            channels = s.Channels.Select(UpcomingResponses.Channel),
+        }),
+    });
 }

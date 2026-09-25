@@ -23,7 +23,7 @@ import { GuideGrid, type SelectedProgram, type WatchedChannel } from '@/componen
 import { LivePlayer } from '@/components/LivePlayer'
 import { ResizableSplit } from '@/components/ResizableSplit'
 import { SearchPage } from '@/components/SearchPage'
-import { TvShowsPage } from '@/components/TvShowsPage'
+import { MoviesPage, SportsPage, TvShowsPage } from '@/components/UpcomingPages'
 
 interface WeatherForecast {
   date: string
@@ -47,6 +47,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Recordings', icon: Disc3 },
   { label: 'Settings', icon: Settings },
 ]
+
+// Pages that use the whole width of the main area rather than a narrow centered column.
+const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports'])
 
 interface ChannelDetails {
   callSign: string
@@ -313,7 +316,7 @@ function App() {
 
         <main
           className={
-            selectedNav === 'Live TV' || selectedNav === 'TV Shows'
+            FULL_WIDTH_NAV.has(selectedNav)
               ? 'flex-1 space-y-6 overflow-y-auto p-6'
               : 'mx-auto w-full max-w-2xl flex-1 space-y-6 overflow-y-auto p-6'
           }
@@ -409,6 +412,10 @@ function App() {
           <SearchPage />
         ) : selectedNav === 'TV Shows' ? (
           <TvShowsPage />
+        ) : selectedNav === 'Movies' ? (
+          <MoviesPage />
+        ) : selectedNav === 'Sports' ? (
+          <SportsPage />
         ) : (
           <>
         <Alert>

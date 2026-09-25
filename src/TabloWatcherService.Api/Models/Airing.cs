@@ -11,6 +11,9 @@ public class Airing
     public string? MoviePath { get; set; }
     public string? SeriesPath { get; set; }
     public string? SeasonPath { get; set; }
+    public string? SportPath { get; set; }
+    // e.g. "live", "new", "cc", "primetime".
+    public string[] Qualifiers { get; set; } = [];
     public AiringDetails AiringDetails { get; set; } = new();
     public EpisodeInfo? Episode { get; set; }
     public MovieAiringInfo? MovieAiring { get; set; }
@@ -46,5 +49,17 @@ public class MovieAiringInfo
 
 public class SportEventInfo
 {
-    public string Description { get; set; } = string.Empty;
+    // The game itself (e.g. "Northwestern at Indiana", or "Day 3" of a tournament) - the
+    // airing's show title is the sport/competition ("College Football").
+    public string? Title { get; set; }
+    public string? Description { get; set; }
+    public string? Venue { get; set; }
+    public SportTeam[] Teams { get; set; } = [];
+    public int? HomeTeamId { get; set; }
+}
+
+public class SportTeam
+{
+    public string Name { get; set; } = string.Empty;
+    public int TeamId { get; set; }
 }

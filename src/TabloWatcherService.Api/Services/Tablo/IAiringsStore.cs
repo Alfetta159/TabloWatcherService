@@ -14,17 +14,36 @@ public record ChannelAirings(GuideChannel Channel, IReadOnlyList<Airing> Airings
 public record AiringSearchResult(Airing Airing, IReadOnlyList<string> MatchedFields, IReadOnlyList<string> MatchedCast);
 
 /// <summary>
-/// A series with at least one airing that hasn't ended yet. <see cref="Series"/> is null if
-/// the series object couldn't be fetched from the device (the airings still identify it).
+/// The series, movie and sport objects the guide's airings point back to (via
+/// <see cref="Airing.SeriesPath"/>, <see cref="Airing.MoviePath"/> and
+/// <see cref="Airing.SportPath"/>), each keyed by its path - the source of artwork,
+/// descriptions and cast, none of which are on the airings themselves.
 /// </summary>
-public record UpcomingSeries(
+public record GuideDetails(
+    IReadOnlyDictionary<string, GuideSeries> Series,
+    IReadOnlyDictionary<string, GuideMovie> Movies,
+    IReadOnlyDictionary<string, GuideSport> Sports);
+
+/// <summary>
+/// A series or movie with at least one airing that hasn't ended yet. <see cref="Details"/> is
+/// null if its series/movie object couldn't be fetched from the device (the airings still
+/// identify it).
+/// </summary>
+public record UpcomingTitle<TDetails>(
     string Path,
     string Title,
-    SeriesDetails? Series,
-    IReadOnlyList<UpcomingSeriesChannel> Channels);
+    TDetails? Details,
+    IReadOnlyList<UpcomingChannel> Channels)
+    where TDetails : class;
 
-/// <summary>One channel a series is coming up on: its soonest airing there and how many there are.</summary>
-public record UpcomingSeriesChannel(GuideChannel Channel, DateTime NextAiring, int AiringCount);
+/// <summary>One channel a title is coming up on: its soonest airing there and how many there are.</summary>
+public record UpcomingChannel(GuideChannel Channel, DateTime NextAiring, int AiringCount);
+
+/// <summary>
+/// A sports event airing that hasn't ended yet, with the sport it belongs to (null if that
+/// couldn't be fetched).
+/// </summary>
+public record UpcomingSportsEvent(Airing Airing, SportDetails? Sport);
 
 /// <summary>The field names reported in <see cref="AiringSearchResult.MatchedFields"/>.</summary>
 public static class SearchFields
@@ -37,8 +56,7 @@ public static class SearchFields
 
 /// <summary>
 /// In-memory store for the guide grid (channels x time), guide search and the upcoming
-/// series list. Populated
-/// periodically by <see cref="AiringsRefreshService"/>; readers see the previous snapshot
+/// series, movie and sports lists. Populated periodically by <see cref="AiringsRefreshService"/>; readers see the previous snapshot
 /// until the next full refresh completes - "Replace" swaps a single reference rather than
 /// mutating in place, so a reader can never observe a half-updated set of channels.
 /// </summary>
@@ -47,18 +65,14 @@ public interface IAiringsStore
     DateTimeOffset? LastUpdated { get; }
 
     /// <param name="airings">Every airing in the guide.</param>
-    /// <param name="series">Series the airings belong to, keyed by path (<see cref="Airing.SeriesPath"/>) - the source of series descriptions and cast.</param>
-    /// <param name="movies">Likewise for movies, keyed by <see cref="Airing.MoviePath"/>.</param>
-    void Replace(
-        IReadOnlyList<Airing> airings,
-        IReadOnlyDictionary<string, GuideSeries> series,
-        IReadOnlyDictionary<string, GuideMovie> movies);
+    /// <param name="details">The series, movies and sports those airings belong to.</param>
+    void Replace(IReadOnlyList<Airing> airings, GuideDetails details);
 
     /// <summary>Channels sorted by channel number, each with airings overlapping [from, to).</summary>
     IReadOnlyList<ChannelAirings> GetGrid(DateTime from, DateTime to);
 
     /// <summary>
-    /// Airings that haven't ended by <paramref name="now"/> whose show/episode title,
+    /// Airings that haven't ended by <paramref name="now"/> whose show/episode/game title,
     /// description or cast contains <paramref name="term"/> at the start of a word, soonest
     /// first. Matching ignores case, accents and runs of whitespace, so "tom  hanks" finds
     /// "Tom Hanks".
@@ -69,5 +83,11 @@ public interface IAiringsStore
     /// Series with airings that haven't ended by <paramref name="now"/>, sorted by title,
     /// each with the channels it's on sorted by soonest airing.
     /// </summary>
-    IReadOnlyList<UpcomingSeries> GetUpcomingSeries(DateTime now);
+    IReadOnlyList<UpcomingTitle<SeriesDetails>> GetUpcomingSeries(DateTime now);
+
+    /// <summary>Likewise for movies.</summary>
+    IReadOnlyList<UpcomingTitle<MovieDetails>> GetUpcomingMovies(DateTime now);
+
+    /// <summary>Sports event airings that haven't ended by <paramref name="now"/>, soonest first.</summary>
+    IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now);
 }
