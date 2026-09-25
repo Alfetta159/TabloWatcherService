@@ -23,12 +23,24 @@ public class CurrentTabloDeviceResolver(
     // changes, so the last one seen is a better answer than none when the lookup fails.
     private string? _lastKnownIp;
 
+    // Callers like ImagesController resolve once per request, and a page of posters is dozens
+    // of requests - re-asking the association server for each burns through its rate limit
+    // (starving the frontend's own /api/servers call), so reuse a recent answer.
+    private static readonly TimeSpan LookupCacheDuration = TimeSpan.FromMinutes(5);
+    private DateTimeOffset _lastLookup = DateTimeOffset.MinValue;
+
     public async Task<ITabloDeviceClient?> ResolveAsync()
     {
+        if (_lastKnownIp is not null && DateTimeOffset.UtcNow - _lastLookup < LookupCacheDuration)
+        {
+            return clientFactory.Create(_lastKnownIp, DevicePort);
+        }
+
         var recordersResponse = await associationServerClient.GetRecordersAsync();
         if (recordersResponse.IsSuccessStatusCode)
         {
             _lastKnownIp = recordersResponse.Content?.Recorders.FirstOrDefault()?.PrivateIp;
+            _lastLookup = DateTimeOffset.UtcNow;
             if (_lastKnownIp is null)
             {
                 logger.LogWarning("The association server returned no Tablo servers");

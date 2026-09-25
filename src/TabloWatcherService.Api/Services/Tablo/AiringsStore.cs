@@ -20,11 +20,17 @@ public partial class AiringsStore : IAiringsStore
         IReadOnlyList<string> Descriptions,
         IReadOnlyList<(string Name, string Normalized)> Cast);
 
-    private record Snapshot(IReadOnlyList<ChannelAirings> Channels, IReadOnlyList<SearchEntry> SearchEntries);
+    // One series' airings (soonest first), with its series object if the device returned one.
+    private record SeriesAirings(string Path, string Title, SeriesDetails? Series, IReadOnlyList<Airing> Airings);
+
+    private record Snapshot(
+        IReadOnlyList<ChannelAirings> Channels,
+        IReadOnlyList<SearchEntry> SearchEntries,
+        IReadOnlyList<SeriesAirings> Series);
 
     // Assigned wholesale by Replace(), never mutated in place, so a concurrent reader
     // always sees one complete, internally-consistent snapshot with no locking needed.
-    private volatile Snapshot _snapshot = new([], []);
+    private volatile Snapshot _snapshot = new([], [], []);
 
     public DateTimeOffset? LastUpdated { get; private set; }
 
@@ -52,7 +58,22 @@ public partial class AiringsStore : IAiringsStore
                 a.MoviePath is null ? null : movies.GetValueOrDefault(a.MoviePath)?.Movie))
             .ToList();
 
-        _snapshot = new Snapshot(channels, searchEntries);
+        // Sports events can carry a series path too, but they're listed under Sports, not
+        // with TV shows.
+        var seriesAirings = airings
+            .Where(a => a.SeriesPath is not null && a.Event is null)
+            .GroupBy(a => a.SeriesPath!)
+            .Select(group =>
+            {
+                var details = series.GetValueOrDefault(group.Key)?.Series;
+                var ordered = group.OrderBy(a => a.AiringDetails.Datetime).ToList();
+                var title = string.IsNullOrWhiteSpace(details?.Title) ? ordered[0].AiringDetails.ShowTitle : details.Title;
+                return new SeriesAirings(group.Key, title, details, ordered);
+            })
+            .OrderBy(s => SortableTitle(s.Title), StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        _snapshot = new Snapshot(channels, searchEntries, seriesAirings);
         LastUpdated = DateTimeOffset.UtcNow;
     }
 
@@ -112,6 +133,38 @@ public partial class AiringsStore : IAiringsStore
         }
 
         return results;
+    }
+
+    public IReadOnlyList<UpcomingSeries> GetUpcomingSeries(DateTime now) =>
+        _snapshot.Series
+            .Select(s => new UpcomingSeries(
+                s.Path,
+                s.Title,
+                s.Series,
+                s.Airings
+                    .Where(a => a.AiringDetails.Datetime.AddSeconds(a.AiringDetails.Duration) > now)
+                    .GroupBy(a => a.AiringDetails.Channel.ObjectId)
+                    .Select(group => new UpcomingSeriesChannel(
+                        group.First().AiringDetails.Channel,
+                        group.First().AiringDetails.Datetime,
+                        group.Count()))
+                    .OrderBy(c => c.NextAiring)
+                    .ToList()))
+            .Where(s => s.Channels.Count > 0)
+            .ToList();
+
+    // Sorts "The Office" with the Os, like a TV guide or library would.
+    private static string SortableTitle(string title)
+    {
+        foreach (var article in (string[])["The ", "A ", "An "])
+        {
+            if (title.StartsWith(article, StringComparison.OrdinalIgnoreCase) && title.Length > article.Length)
+            {
+                return title[article.Length..];
+            }
+        }
+
+        return title;
     }
 
     // Only counts a match that starts a word, so "ncis" finds "NCIS: Los Angeles" but not
