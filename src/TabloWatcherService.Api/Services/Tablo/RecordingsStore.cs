@@ -78,7 +78,31 @@ public class RecordingsStore : IRecordingsStore
         RecordingParents Parents,
         IReadOnlyList<RecordingGroup> Groups);
 
+    // Persisted only in Development (see DevCache) - the raw inputs to Replace(), so a
+    // restarted debugger can rebuild the same snapshot without waiting on a fresh,
+    // sequentially-batched fetch from the Tablo device (thousands of recordings, tens of
+    // batches).
+    private record CachedRecordings(
+        DateTimeOffset SavedAt, IReadOnlyList<RecordedAiring> Recordings, RecordingParents Parents);
+
     private volatile Snapshot _snapshot = new(new Dictionary<string, RecordedAiring>(), RecordingParents.Empty, []);
+
+    private readonly string? _devCachePath;
+
+    public RecordingsStore(IHostEnvironment environment)
+    {
+        if (!environment.IsDevelopment())
+        {
+            return;
+        }
+
+        _devCachePath = Path.Combine(environment.ContentRootPath, "dev-recordings-cache.json");
+        if (DevCache.Load<CachedRecordings>(_devCachePath) is { } cached)
+        {
+            BuildSnapshot(cached.Recordings, cached.Parents);
+            LastUpdated = cached.SavedAt;
+        }
+    }
 
     public DateTimeOffset? LastUpdated { get; private set; }
 
@@ -90,12 +114,20 @@ public class RecordingsStore : IRecordingsStore
 
     public void Replace(IReadOnlyList<RecordedAiring> recordings, RecordingParents parents)
     {
+        BuildSnapshot(recordings, parents);
+        LastUpdated = DateTimeOffset.UtcNow;
+
+        if (_devCachePath is not null)
+        {
+            DevCache.Save(_devCachePath, new CachedRecordings(LastUpdated.Value, recordings, parents));
+        }
+    }
+
+    private void BuildSnapshot(IReadOnlyList<RecordedAiring> recordings, RecordingParents parents) =>
         _snapshot = new Snapshot(
             recordings.DistinctBy(r => r.Path).ToDictionary(r => r.Path),
             parents,
             Group(recordings, parents));
-        LastUpdated = DateTimeOffset.UtcNow;
-    }
 
     // Both rebuild the snapshot from the current one, so a concurrent full refresh may win or
     // lose the race - harmless, since it reads the device's own current state anyway.
