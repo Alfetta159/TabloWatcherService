@@ -11,7 +11,13 @@ Restart=on-failure
 RestartSec=5
 User=tablowatcher
 Environment=ASPNETCORE_ENVIRONMENT=Production
-Environment=Kestrel__Endpoints__Http__Url=http://0.0.0.0:8080
+# Port 80, so browsers need no port: http://<host>.local/ (see README). Binding a port below
+# 1024 normally takes root; this grants the unprivileged service user just that one
+# capability, and the bounding set keeps it from ever gaining any other. "*" listens on
+# IPv6 as well as IPv4 - a .local name often resolves to IPv6 first.
+Environment=Kestrel__Endpoints__Http__Url=http://*:80
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target

@@ -5,7 +5,9 @@
 #   packaging/build-deb.sh [version]
 #
 # Requires fpm (gem install --no-document fpm) and dotnet on the machine building the
-# package - neither is needed on the machine installing the resulting .deb.
+# package - neither is needed on the machine installing the resulting .deb. It recommends
+# avahi-daemon, which advertises the machine as <hostname>.local, so browsers on the LAN
+# can reach the service by name.
 set -euo pipefail
 
 VERSION="${1:-1.0.0}"
@@ -46,6 +48,7 @@ fpm -s dir -t deb \
     --maintainer "Alfetta159" \
     --license "MIT" \
     --depends "libc6" \
+    --deb-recommends "avahi-daemon" \
     --after-install "$REPO_ROOT/packaging/debian/postinst.sh" \
     --deb-systemd "$REPO_ROOT/packaging/debian/tablowatcherservice.service" \
     --deb-systemd-enable \
