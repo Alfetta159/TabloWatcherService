@@ -52,6 +52,12 @@ public record UpcomingChannel(GuideChannel Channel, DateTime NextAiring, int Air
 /// </summary>
 public record UpcomingSportsEvent(Airing Airing, SportDetails? Sport);
 
+/// <summary>
+/// An upcoming airing set to record (or in conflict), with the series, movie or sport it
+/// belongs to - whichever applies, if the device returned it.
+/// </summary>
+public record ScheduledAiring(Airing Airing, SeriesDetails? Series, MovieDetails? Movie, SportDetails? Sport);
+
 /// <summary>The field names reported in <see cref="AiringSearchResult.MatchedFields"/>.</summary>
 public static class SearchFields
 {
@@ -100,6 +106,12 @@ public interface IAiringsStore
 
     /// <summary>One movie (by its path, e.g. "/guide/movies/123") as in <see cref="GetUpcomingMovies"/>, or null if it has no upcoming airings.</summary>
     UpcomingTitle<MovieDetails>? GetUpcomingMovie(string moviePath, DateTime now);
+
+    /// <summary>
+    /// Airings that haven't ended by <paramref name="now"/> and are set to record or in
+    /// conflict, soonest first.
+    /// </summary>
+    IReadOnlyList<ScheduledAiring> GetScheduledAirings(DateTime now);
 
     /// <summary>An airing in the guide by its path, or null if the guide doesn't have it.</summary>
     Airing? GetAiring(string airingPath);

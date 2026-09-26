@@ -33,7 +33,8 @@ public partial class AiringsStore : IAiringsStore
         IReadOnlyList<TitleAirings<MovieDetails>> Movies,
         IReadOnlyList<UpcomingSportsEvent> SportsEvents,
         IReadOnlyDictionary<string, Airing> AiringsByPath,
-        IReadOnlyDictionary<string, TitleAirings<MovieDetails>> MoviesByPath);
+        IReadOnlyDictionary<string, TitleAirings<MovieDetails>> MoviesByPath,
+        GuideDetails Details);
 
     // Assigned wholesale by Replace(), never mutated in place, so a concurrent reader
     // always sees one complete, internally-consistent snapshot with no locking needed. (The
@@ -41,7 +42,11 @@ public partial class AiringsStore : IAiringsStore
     private volatile Snapshot _snapshot = new(
         [], [], [], [], [],
         new Dictionary<string, Airing>(),
-        new Dictionary<string, TitleAirings<MovieDetails>>());
+        new Dictionary<string, TitleAirings<MovieDetails>>(),
+        new GuideDetails(
+            new Dictionary<string, GuideSeries>(),
+            new Dictionary<string, GuideMovie>(),
+            new Dictionary<string, GuideSport>()));
 
     public DateTimeOffset? LastUpdated { get; private set; }
 
@@ -85,7 +90,8 @@ public partial class AiringsStore : IAiringsStore
             movieAirings,
             sportsEvents,
             airings.DistinctBy(a => a.Path).ToDictionary(a => a.Path),
-            movieAirings.ToDictionary(m => m.Path));
+            movieAirings.ToDictionary(m => m.Path),
+            details);
         LastUpdated = DateTimeOffset.UtcNow;
     }
 
@@ -156,6 +162,20 @@ public partial class AiringsStore : IAiringsStore
 
     public UpcomingTitle<MovieDetails>? GetUpcomingMovie(string moviePath, DateTime now) =>
         _snapshot.MoviesByPath.TryGetValue(moviePath, out var movie) ? Upcoming([movie], now).FirstOrDefault() : null;
+
+    public IReadOnlyList<ScheduledAiring> GetScheduledAirings(DateTime now)
+    {
+        var snapshot = _snapshot;
+        return snapshot.AiringsByPath.Values
+            .Where(a => HasNotEnded(a, now) && a.Schedule is { } schedule && (schedule.IsScheduled || schedule.IsConflict))
+            .OrderBy(a => a.AiringDetails.Datetime)
+            .Select(a => new ScheduledAiring(
+                a,
+                SeriesFor(a, snapshot.Details),
+                MovieFor(a, snapshot.Details),
+                SportFor(a, snapshot.Details)))
+            .ToList();
+    }
 
     public Airing? GetAiring(string airingPath) => _snapshot.AiringsByPath.GetValueOrDefault(airingPath);
 

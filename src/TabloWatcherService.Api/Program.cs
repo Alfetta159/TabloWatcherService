@@ -67,6 +67,11 @@ builder.Services.AddSingleton<ICurrentTabloDeviceResolver, CurrentTabloDeviceRes
 builder.Services.AddSingleton<IAiringsStore, AiringsStore>();
 builder.Services.AddHostedService<AiringsRefreshService>();
 
+// Recordings page: RecordingsRefreshService keeps this in-memory cache of the device's
+// recordings current; RecordingsController just reads it.
+builder.Services.AddSingleton<IRecordingsStore, RecordingsStore>();
+builder.Services.AddHostedService<RecordingsRefreshService>();
+
 // Genre tags blocked for everyone, persisted to a small JSON file (see BlockedTagsStore).
 builder.Services.AddSingleton<IBlockedTagsStore, BlockedTagsStore>();
 

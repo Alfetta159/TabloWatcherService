@@ -51,6 +51,9 @@ public interface ITabloDeviceClient
     [Get("/guide/movies/{movieId}")]
     Task<ApiResponse<GuideMovie>> GetGuideMovieAsync(int movieId);
 
+    [Get("/recordings/airings")]
+    Task<ApiResponse<string[]>> GetRecordedAiringsAsync();
+
     [Get("/guide/airings")]
     Task<ApiResponse<string[]>> GetGuideAiringsAsync();
 

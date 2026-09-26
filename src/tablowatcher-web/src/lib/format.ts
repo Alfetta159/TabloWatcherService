@@ -9,3 +9,12 @@ export function formatRating(rating: string | null): string | null {
 export function formatStars(stars: number): string {
   return '★'.repeat(Math.floor(stars)) + (stars % 1 ? '½' : '')
 }
+
+// Sorts "The Office" with the Os, matching the server's own title order (AiringsStore).
+export function sortableTitle(title: string): string {
+  return title.replace(/^(the|a|an)\s+(?=\S)/i, '')
+}
+
+export function compareTitles(a: string, b: string): number {
+  return sortableTitle(a).localeCompare(sortableTitle(b), undefined, { sensitivity: 'base' })
+}
