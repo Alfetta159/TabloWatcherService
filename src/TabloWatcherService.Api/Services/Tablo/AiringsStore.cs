@@ -163,11 +163,13 @@ public partial class AiringsStore : IAiringsStore
     public UpcomingTitle<MovieDetails>? GetUpcomingMovie(string moviePath, DateTime now) =>
         _snapshot.MoviesByPath.TryGetValue(moviePath, out var movie) ? Upcoming([movie], now).FirstOrDefault() : null;
 
-    public IReadOnlyList<ScheduledAiring> GetScheduledAirings(DateTime now)
+    public IReadOnlyList<ScheduledAiring> GetScheduledAirings(DateTime now, bool includeSkipped = false)
     {
         var snapshot = _snapshot;
         return snapshot.AiringsByPath.Values
-            .Where(a => HasNotEnded(a, now) && a.Schedule is { } schedule && (schedule.IsScheduled || schedule.IsConflict))
+            .Where(a => HasNotEnded(a, now)
+                && a.Schedule is { } schedule
+                && (schedule.IsScheduled || schedule.IsConflict || (includeSkipped && schedule.IsSkipped)))
             .OrderBy(a => a.AiringDetails.Datetime)
             .Select(a => new ScheduledAiring(
                 a,

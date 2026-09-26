@@ -109,9 +109,10 @@ public interface IAiringsStore
 
     /// <summary>
     /// Airings that haven't ended by <paramref name="now"/> and are set to record or in
-    /// conflict, soonest first.
+    /// conflict - plus, with <paramref name="includeSkipped"/>, ones a recording rule covers
+    /// but the device is skipping (e.g. already recorded) - soonest first.
     /// </summary>
-    IReadOnlyList<ScheduledAiring> GetScheduledAirings(DateTime now);
+    IReadOnlyList<ScheduledAiring> GetScheduledAirings(DateTime now, bool includeSkipped = false);
 
     /// <summary>
     /// The guide airing of a series/movie/sport/program (by its guide path) that starts at
