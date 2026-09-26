@@ -444,3 +444,7 @@ packaging/dist/
 
 # Runtime state written next to the API (see BlockedTagsStore) - not source.
 src/TabloWatcherService.Api/blocked-tags.json
+
+# Dev-only guide/recordings cache (see DevCache) - never written outside Development.
+src/TabloWatcherService.Api/dev-guide-cache.json
+src/TabloWatcherService.Api/dev-recordings-cache.json

@@ -36,6 +36,11 @@ public partial class AiringsStore : IAiringsStore
         IReadOnlyDictionary<string, TitleAirings<MovieDetails>> MoviesByPath,
         GuideDetails Details);
 
+    // Persisted only in Development (see DevCache) - the raw inputs to Replace(), so a
+    // restarted debugger can rebuild the same snapshot without waiting on a fresh,
+    // sequentially-batched fetch from the Tablo device.
+    private record CachedGuide(DateTimeOffset SavedAt, IReadOnlyList<Airing> Airings, GuideDetails Details);
+
     // Assigned wholesale by Replace(), never mutated in place, so a concurrent reader
     // always sees one complete, internally-consistent snapshot with no locking needed. (The
     // one exception is an airing's Schedule - see UpdateSchedule.)
@@ -48,9 +53,37 @@ public partial class AiringsStore : IAiringsStore
             new Dictionary<string, GuideMovie>(),
             new Dictionary<string, GuideSport>()));
 
+    private readonly string? _devCachePath;
+
+    public AiringsStore(IHostEnvironment environment)
+    {
+        if (!environment.IsDevelopment())
+        {
+            return;
+        }
+
+        _devCachePath = Path.Combine(environment.ContentRootPath, "dev-guide-cache.json");
+        if (DevCache.Load<CachedGuide>(_devCachePath) is { } cached)
+        {
+            BuildSnapshot(cached.Airings, cached.Details);
+            LastUpdated = cached.SavedAt;
+        }
+    }
+
     public DateTimeOffset? LastUpdated { get; private set; }
 
     public void Replace(IReadOnlyList<Airing> airings, GuideDetails details)
+    {
+        BuildSnapshot(airings, details);
+        LastUpdated = DateTimeOffset.UtcNow;
+
+        if (_devCachePath is not null)
+        {
+            DevCache.Save(_devCachePath, new CachedGuide(LastUpdated.Value, airings, details));
+        }
+    }
+
+    private void BuildSnapshot(IReadOnlyList<Airing> airings, GuideDetails details)
     {
         var channels = airings
             .GroupBy(a => a.AiringDetails.Channel.ObjectId)
@@ -92,7 +125,6 @@ public partial class AiringsStore : IAiringsStore
             airings.DistinctBy(a => a.Path).ToDictionary(a => a.Path),
             movieAirings.ToDictionary(m => m.Path),
             details);
-        LastUpdated = DateTimeOffset.UtcNow;
     }
 
     public IReadOnlyList<ChannelAirings> GetGrid(DateTime from, DateTime to) =>
