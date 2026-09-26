@@ -19,9 +19,9 @@ served from your own machine on your home network.
 - **Tuner labels:** each channel that's on one of the device's tuners shows "Tuner N",
   whether this app, another Tablo client or a recording is using it.
 
-### Prime Time
+### Search
 
-> This will probably be dropped as its value is limited and replaced with a universal search feature.
+Search allows you to search by title, actor, director or any keyword that might appear in the titles, descriptions. Results are grouped and can be collapsed. Or items in the group can be marked for recording. Results can be filtered by tags as well.
 
 ### TV Shows
 
