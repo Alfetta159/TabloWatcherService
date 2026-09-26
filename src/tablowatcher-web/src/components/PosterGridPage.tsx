@@ -3,6 +3,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { TagFilterControls } from '@/components/TagFilterControls'
+import { useTagFilters } from '@/hooks/useTagFilters'
 
 // A channel as the TV shows/movies/sports endpoints return it (UpcomingResponses on the server).
 export interface ChannelInfo {
@@ -39,7 +41,31 @@ export interface PosterCardData {
   channels: UpcomingChannel[]
   // Highlighted on the poster, e.g. "Live".
   flag?: string | null
+  // This card's value for each of the page's facets (see Facet), keyed by Facet.key; null
+  // or missing means it has none (e.g. an unrated movie).
+  facets?: Record<string, string | null>
 }
+
+// An extra dropdown filter over one property of the cards, like a movie's rating.
+// Its options are whatever values the cards actually have, plus "Not rated" (or noneLabel)
+// when some card has none.
+export interface Facet {
+  key: string
+  label: string
+  // The dropdown's "no filter" option, e.g. "All ratings".
+  placeholder: string
+  formatValue?: (value: string) => string
+  // Orders the options; defaults to alphabetical.
+  compare?: (a: string, b: string) => number
+  noneLabel?: string
+}
+
+// Stands in for "no value" (e.g. unrated) as a facet option; no real rating looks like it.
+const NO_VALUE = '__none__'
+
+// Shared by the Channel and facet dropdowns.
+const SELECT_CLASS_NAME =
+  'border-input bg-background focus-visible:ring-ring/50 h-9 rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px]'
 
 interface UpcomingResponse<T> {
   updatedAt: string | null
@@ -126,7 +152,7 @@ function PosterCard({
 }
 
 interface PosterGridPageProps<T> {
-  // An upcoming-list endpoint returning { updatedAt, items }, already in display order.
+  // An upcoming-list endpoint returning { updatedAt, items } (the page sorts them itself).
   endpoint: string
   // e.g. ['show', 'shows'], for "12 shows coming up".
   noun: [singular: string, plural: string]
@@ -134,6 +160,28 @@ interface PosterGridPageProps<T> {
   placeholderIcon: ComponentType<{ className?: string }>
   // Off where every item is a single airing (sports events), so the count is always 1.
   showAiringCount?: boolean
+  facets?: Facet[]
+  // The initial order; the Sort dropdown can change it.
+  defaultSort?: SortOrder
+}
+
+export type SortOrder = 'title' | 'airDate'
+
+const SORT_LABELS: Record<SortOrder, string> = { title: 'Title', airDate: 'Air date' }
+
+// Sorts "The Office" with the Os, matching the server's own title order (AiringsStore).
+function sortableTitle(title: string): string {
+  return title.replace(/^(the|a|an)\s+(?=\S)/i, '')
+}
+
+function compareTitles(a: PosterCardData, b: PosterCardData): number {
+  return sortableTitle(a.title).localeCompare(sortableTitle(b.title), undefined, { sensitivity: 'base' })
+}
+
+const NO_FACETS: Facet[] = []
+
+function facetValue(card: PosterCardData, facet: Facet): string {
+  return card.facets?.[facet.key] ?? NO_VALUE
 }
 
 // A poster card per upcoming title (TV show, movie, sports event), with a channel filter.
@@ -143,10 +191,18 @@ export function PosterGridPage<T>({
   toCard,
   placeholderIcon,
   showAiringCount = true,
+  facets = NO_FACETS,
+  defaultSort = 'title',
 }: PosterGridPageProps<T>) {
+  const [sortOrder, setSortOrder] = useState<SortOrder>(defaultSort)
   const [data, setData] = useState<UpcomingResponse<T> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [channelFilter, setChannelFilter] = useState(ALL_CHANNELS)
+  // Facet key -> the value chosen in its dropdown; absent means no filtering.
+  const [facetSelections, setFacetSelections] = useState<Record<string, string>>({})
+  // `endpoint` is already e.g. "/api/tv-shows", so it doubles as the "kind" the tags
+  // endpoint expects.
+  const tagFilters = useTagFilters(endpoint.replace(/^\/api\//, ''))
 
   useEffect(() => {
     let cancelled = false
@@ -189,6 +245,21 @@ export function PosterGridPage<T>({
     return [...byId.values()].sort((a, b) => a.major - b.major || a.minor - b.minor)
   }, [cards])
 
+  // Each facet's options: the values the cards actually have, sorted, with "no value" last.
+  const facetOptions = useMemo(
+    () =>
+      facets.map((facet) => {
+        const values = new Set(cards.map((card) => facetValue(card, facet)))
+        const hasNone = values.delete(NO_VALUE)
+        const options = [...values]
+          .sort(facet.compare ?? ((a, b) => a.localeCompare(b)))
+          .map((value) => ({ value, label: facet.formatValue?.(value) ?? value }))
+        if (hasNone) options.push({ value: NO_VALUE, label: facet.noneLabel ?? 'Not rated' })
+        return options
+      }),
+    [cards, facets],
+  )
+
   // Each card paired with just the channels that pass the filter (so it shows the next
   // airing on the chosen channel), dropping cards with none.
   const visible = useMemo(
@@ -201,8 +272,22 @@ export function PosterGridPage<T>({
               ? card.channels
               : card.channels.filter((c) => String(c.objectId) === channelFilter),
         }))
-        .filter(({ channels }) => channels.length > 0),
-    [cards, channelFilter],
+        .filter(({ channels }) => channels.length > 0)
+        .filter(({ card }) => tagFilters.includeTags.size === 0 || card.genres.some((g) => tagFilters.includeTags.has(g)))
+        .filter(({ card }) =>
+          facets.every((facet) => {
+            const selected = facetSelections[facet.key]
+            return !selected || selected === facetValue(card, facet)
+          }),
+        )
+        // By air date means the soonest airing on the channels still showing (so it follows
+        // the Channel filter), then by title for airings at the same time.
+        .sort((a, b) =>
+          sortOrder === 'airDate'
+            ? Date.parse(a.channels[0].nextAiring) - Date.parse(b.channels[0].nextAiring) || compareTitles(a.card, b.card)
+            : compareTitles(a.card, b.card),
+        ),
+    [cards, channelFilter, tagFilters.includeTags, facets, facetSelections, sortOrder],
   )
 
   const filterId = `${endpoint}-channel`
@@ -210,22 +295,61 @@ export function PosterGridPage<T>({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor={filterId}>Channel</Label>
-          <select
-            id={filterId}
-            value={channelFilter}
-            onChange={(e) => setChannelFilter(e.target.value)}
-            className="border-input bg-background focus-visible:ring-ring/50 h-9 min-w-56 rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
-          >
-            <option value={ALL_CHANNELS}>All channels</option>
-            {channelOptions.map((c) => (
-              <option key={c.objectId} value={String(c.objectId)}>
-                {channelNumber(c)} {c.callSign}
-                {c.network && c.network !== c.callSign ? ` (${c.network})` : ''}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor={filterId}>Channel</Label>
+            <select
+              id={filterId}
+              value={channelFilter}
+              onChange={(e) => setChannelFilter(e.target.value)}
+              className={`${SELECT_CLASS_NAME} min-w-56`}
+            >
+              <option value={ALL_CHANNELS}>All channels</option>
+              {channelOptions.map((c) => (
+                <option key={c.objectId} value={String(c.objectId)}>
+                  {channelNumber(c)} {c.callSign}
+                  {c.network && c.network !== c.callSign ? ` (${c.network})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor={`${endpoint}-sort`}>Sort by</Label>
+            <select
+              id={`${endpoint}-sort`}
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+              className={`${SELECT_CLASS_NAME} min-w-32`}
+            >
+              {Object.entries(SORT_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {facets.map((facet, i) => (
+            <div key={facet.key} className="space-y-1.5">
+              <Label htmlFor={`${endpoint}-${facet.key}`}>{facet.label}</Label>
+              <select
+                id={`${endpoint}-${facet.key}`}
+                value={facetSelections[facet.key] ?? ''}
+                onChange={(e) => setFacetSelections((prev) => ({ ...prev, [facet.key]: e.target.value }))}
+                className={`${SELECT_CLASS_NAME} min-w-36`}
+              >
+                <option value="">{facet.placeholder}</option>
+                {facetOptions[i].map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+
+          <TagFilterControls {...tagFilters} />
         </div>
         {data?.updatedAt && (
           <p className="text-muted-foreground text-sm">

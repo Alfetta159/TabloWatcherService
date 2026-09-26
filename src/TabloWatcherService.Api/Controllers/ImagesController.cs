@@ -21,20 +21,31 @@ public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : Cont
             return NotFound();
         }
 
-        using var response = await client.GetImageAsync(imageId);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            return StatusCode((int)response.StatusCode);
+            using var response = await client.GetImageAsync(imageId);
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode((int)response.StatusCode);
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+
+            // An image id always names the same image, so let the browser keep it rather than
+            // re-fetching through the device (e.g. every poster on the TV Shows page, each visit).
+            Response.Headers.CacheControl = "private, max-age=604800, immutable";
+
+            return File(bytes, contentType);
         }
-
-        var bytes = await response.Content.ReadAsByteArrayAsync();
-        var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
-
-        // An image id always names the same image, so let the browser keep it rather than
-        // re-fetching through the device (e.g. every poster on the TV Shows page, each visit).
-        Response.Headers.CacheControl = "private, max-age=604800, immutable";
-
-        return File(bytes, contentType);
+        catch (HttpRequestException)
+        {
+            // GetImageAsync returns a raw HttpResponseMessage (not ApiResponse<T>, which
+            // catches this internally - see RefitResponseExtensions), so the device's known
+            // occasional dropped connection surfaces as a real exception here. Nothing to
+            // retry against for a single image load, so just report it rather than 500.
+            return StatusCode(StatusCodes.Status502BadGateway);
+        }
     }
 
     // A movie/series airing only carries a path back to its movie or series (see

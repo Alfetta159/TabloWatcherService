@@ -9,9 +9,14 @@ public record ChannelAirings(GuideChannel Channel, IReadOnlyList<Airing> Airings
 
 /// <summary>
 /// One airing that matched a search, with which of its fields matched (see
-/// <see cref="SearchFields"/>) and, for a cast match, the matching cast members' names.
+/// <see cref="SearchFields"/>), for a cast match the matching cast members' names, and the
+/// genres of its series/movie/sport (for the Search page's own tag filters).
 /// </summary>
-public record AiringSearchResult(Airing Airing, IReadOnlyList<string> MatchedFields, IReadOnlyList<string> MatchedCast);
+public record AiringSearchResult(
+    Airing Airing,
+    IReadOnlyList<string> MatchedFields,
+    IReadOnlyList<string> MatchedCast,
+    IReadOnlyList<string> Genres);
 
 /// <summary>
 /// The series, movie and sport objects the guide's airings point back to (via
@@ -90,4 +95,26 @@ public interface IAiringsStore
 
     /// <summary>Sports event airings that haven't ended by <paramref name="now"/>, soonest first.</summary>
     IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now);
+
+    /// <summary>
+    /// Every genre appearing on any series currently in the guide, alphabetized -
+    /// regardless of whether it's blocked (see IBlockedTagsStore) or has already aired, so
+    /// a tag doesn't disappear from the filter UI just because every airing carrying it
+    /// currently happens to be blocked or in the past. Scoped to series only (not movies or
+    /// sports) so, e.g., the TV Shows page doesn't offer a tag that only ever appears on
+    /// movies.
+    /// </summary>
+    IReadOnlyList<string> GetSeriesGenres();
+
+    /// <summary>Likewise for movies.</summary>
+    IReadOnlyList<string> GetMovieGenres();
+
+    /// <summary>Likewise for sports.</summary>
+    IReadOnlyList<string> GetSportsGenres();
+
+    /// <summary>
+    /// Every genre from any of the above combined, alphabetized - for the Search page, which
+    /// isn't scoped to one content type the way TV Shows/Movies/Sports are.
+    /// </summary>
+    IReadOnlyList<string> GetAllGenres();
 }

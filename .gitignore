@@ -441,3 +441,6 @@ src/tablowatcher-web/.vite/
 # Debian packaging (packaging/build-deb.sh) - staged publish output and built .deb files.
 packaging/staging/
 packaging/dist/
+
+# Runtime state written next to the API (see BlockedTagsStore) - not source.
+src/TabloWatcherService.Api/blocked-tags.json
