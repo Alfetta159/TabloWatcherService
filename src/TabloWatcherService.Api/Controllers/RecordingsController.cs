@@ -15,6 +15,7 @@ public class RecordingsController(
     IAiringsStore airings,
     ICurrentTabloDeviceResolver deviceResolver) : ControllerBase
 {
+    // The body of watch/stop/delete: which recording.
     public record WatchRequest(string Path);
 
     /// <summary>
@@ -178,6 +179,107 @@ public class RecordingsController(
         }
 
         return Ok(new { playlistUrl = response.Content.PlaylistUrl });
+    }
+
+    /// <summary>
+    /// Stops a recording in progress, keeping what's been recorded so far. The device has no
+    /// "stop" call as such: this cancels the schedule on the guide airing being recorded (the
+    /// same PATCH as <see cref="AiringsController.SetSchedule"/>).
+    /// </summary>
+    /// <returns>The recording, re-read after stopping.</returns>
+    [HttpPost("stop")]
+    public async Task<IActionResult> Stop([FromBody] WatchRequest request)
+    {
+        if (!recordings.Recordings.TryGetValue(request.Path, out var recording))
+        {
+            return NotFound();
+        }
+        if (recording.VideoDetails?.State != "recording")
+        {
+            return Problem(statusCode: StatusCodes.Status409Conflict, detail: "This isn't being recorded right now.");
+        }
+
+        var guidePath = recordings.GuidePathOf(recording);
+        var airing = guidePath is null ? null : airings.FindAiring(guidePath, recording.AiringDetails.Datetime);
+        if (airing is null)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                detail: "Couldn't find the guide airing this is being recorded from.");
+        }
+
+        var client = await deviceResolver.ResolveAsync();
+        if (client is null)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+
+        try
+        {
+            var response = await client.SetAiringScheduledAsync(airing.Path.TrimStart('/'), new ScheduleRequest(false));
+            if (!response.IsSuccessStatusCode)
+            {
+                return response.ToErrorResult();
+            }
+            if (response.Content?.Schedule is { } schedule)
+            {
+                airings.UpdateSchedule(airing.Path, schedule);
+            }
+
+            // Re-read the recording so the page shows it finished right away.
+            var refreshed = await client.PostBatchAsync<RecordedAiring>([request.Path]);
+            if (refreshed is { IsSuccessStatusCode: true, Content: not null }
+                && refreshed.Content.TryGetValue(request.Path, out var updated) && updated is not null)
+            {
+                recordings.Upsert(updated);
+                recording = updated;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway);
+        }
+
+        return Ok(new { path = recording.Path, state = recording.VideoDetails?.State });
+    }
+
+    /// <summary>
+    /// Deletes a recording from the device - irreversibly. Refuses one still being recorded
+    /// (stop it first).
+    /// </summary>
+    [HttpPost("delete")]
+    public async Task<IActionResult> Delete([FromBody] WatchRequest request)
+    {
+        if (!recordings.Recordings.TryGetValue(request.Path, out var recording))
+        {
+            return NotFound();
+        }
+        if (recording.VideoDetails?.State == "recording")
+        {
+            return Problem(statusCode: StatusCodes.Status409Conflict, detail: "Stop the recording before deleting it.");
+        }
+
+        var client = await deviceResolver.ResolveAsync();
+        if (client is null)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+
+        try
+        {
+            var response = await client.DeleteRecordingAsync(request.Path.TrimStart('/'));
+            if (!response.IsSuccessStatusCode)
+            {
+                return response.ToErrorResult();
+            }
+        }
+        catch (HttpRequestException)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway);
+        }
+
+        recordings.Remove(request.Path);
+        return NoContent();
     }
 
     private static string? Subtitle(RecordingGroup group, RecordedAiring latest) => group.Kind switch

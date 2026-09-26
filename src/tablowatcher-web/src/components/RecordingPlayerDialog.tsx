@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { LoaderCircle, Play, RotateCcw } from 'lucide-react'
+import { CircleStop, LoaderCircle, Play, RotateCcw, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -69,15 +69,44 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
+// Stops (keeping what's recorded so far) or deletes one recording.
+async function postRecordingAction(action: 'stop' | 'delete', path: string): Promise<void> {
+  const res = await fetch(`/api/recordings/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  })
+  if (!res.ok) {
+    const problem = (await res.json().catch(() => null)) as { detail?: string } | null
+    throw new Error(problem?.detail ?? (res.status === 502 ? "The Tablo didn't respond - try again" : `API returned ${res.status}`))
+  }
+}
+
 // A recorded movie in a large dialog, split 1:3 - its details and recordings on the left,
 // playing on the right. Playback starts on open, resuming where it was left off.
-export function RecordingPlayerDialog({ moviePath }: { moviePath: string }) {
+// `onChanged` tells the page to re-read its list after a recording is stopped or deleted;
+// `onEmpty` closes the dialog once the movie has no recordings left.
+export function RecordingPlayerDialog({
+  moviePath,
+  onChanged,
+  onEmpty,
+}: {
+  moviePath: string
+  onChanged: () => void
+  onEmpty: () => void
+}) {
   const [movie, setMovie] = useState<RecordedMovie | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [playRequest, setPlayRequest] = useState<PlayRequest | null>(null)
   const [playlistUrl, setPlaylistUrl] = useState<string | null>(null)
   const [watchError, setWatchError] = useState<string | null>(null)
   const [posterFailed, setPosterFailed] = useState(false)
+  // Bumped to re-read the movie after a stop or delete.
+  const [reloadToken, setReloadToken] = useState(0)
+  const [actionBusy, setActionBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  // Deleting can't be undone, so it takes a second click.
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const movieId = moviePath.split('/').pop()
 
   // Clears the last stream here rather than in the effect that fetches the next one.
@@ -97,16 +126,39 @@ export function RecordingPlayerDialog({ moviePath }: { moviePath: string }) {
       .then((m) => {
         if (cancelled) return
         setMovie(m)
-        const newest = m.recordings[0]
-        if (newest) playFrom(newest, resumePosition(newest))
+        // Keep playing what's playing, unless it's gone (deleted) or nothing has started yet.
+        setPlayRequest((current) => {
+          if (current && m.recordings.some((r) => r.path === current.path)) return current
+          const newest = m.recordings[0]
+          if (!newest) return null
+          setPlaylistUrl(null)
+          setWatchError(null)
+          return { path: newest.path, startAt: resumePosition(newest), attempt: (current?.attempt ?? 0) + 1 }
+        })
       })
       .catch((err) => {
-        if (!cancelled) setLoadError(err.message)
+        if (cancelled) return
+        // Its last recording was deleted, so the movie has dropped out of the recordings.
+        if (reloadToken > 0 && err.message === 'API returned 404') onEmpty()
+        else setLoadError(err.message)
       })
     return () => {
       cancelled = true
     }
-  }, [movieId])
+  }, [movieId, reloadToken, onEmpty])
+
+  function runAction(action: 'stop' | 'delete', recording: MovieRecording) {
+    setActionBusy(true)
+    setActionError(null)
+    postRecordingAction(action, recording.path)
+      .then(() => {
+        setConfirmingDelete(false)
+        setReloadToken((t) => t + 1)
+        onChanged()
+      })
+      .catch((err) => setActionError(err.message))
+      .finally(() => setActionBusy(false))
+  }
 
   // Each play request gets a fresh stream from the device (its session token is short-lived).
   useEffect(() => {
@@ -199,6 +251,36 @@ export function RecordingPlayerDialog({ moviePath }: { moviePath: string }) {
               </div>
             )}
 
+            {playing && (
+              <div className="space-y-2">
+                {playing.state === 'recording' ? (
+                  <Button size="sm" variant="destructive" disabled={actionBusy} onClick={() => runAction('stop', playing)}>
+                    {actionBusy ? <LoaderCircle className="size-4 animate-spin" /> : <CircleStop className="size-4" />}
+                    Stop recording
+                  </Button>
+                ) : confirmingDelete ? (
+                  <div className="border-destructive/40 bg-destructive/5 space-y-2 rounded-md border p-2">
+                    <p className="text-sm">Delete this recording? This can't be undone.</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="destructive" disabled={actionBusy} onClick={() => runAction('delete', playing)}>
+                        {actionBusy ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                        Delete
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={actionBusy} onClick={() => setConfirmingDelete(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setConfirmingDelete(true)}>
+                    <Trash2 className="size-4" />
+                    Delete recording
+                  </Button>
+                )}
+                {actionError && <p className="text-destructive text-xs">{actionError}</p>}
+              </div>
+            )}
+
             <Section title={movie.recordings.length === 1 ? 'Recording' : `Recordings (${movie.recordings.length})`}>
               <div className="space-y-2">
                 {movie.recordings.map((r) => {
@@ -207,7 +289,11 @@ export function RecordingPlayerDialog({ moviePath }: { moviePath: string }) {
                     <button
                       key={r.path}
                       type="button"
-                      onClick={() => !current && playFrom(r, resumePosition(r))}
+                      onClick={() => {
+                        if (current) return
+                        setConfirmingDelete(false)
+                        playFrom(r, resumePosition(r))
+                      }}
                       className={`w-full rounded-md border p-2 text-left text-xs transition-colors ${current ? 'border-primary bg-primary/5' : 'hover:bg-muted'}`}
                       aria-pressed={current}
                     >

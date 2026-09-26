@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { CircleDot, Clapperboard } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -85,6 +85,8 @@ const LOADING_POLL_INTERVAL_MS = 5_000
 function usePolledList<T>(endpoint: string) {
   const [data, setData] = useState<ListResponse<T> | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Bumped to re-read right away rather than at the next poll.
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -116,9 +118,10 @@ function usePolledList<T>(endpoint: string) {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [endpoint])
+  }, [endpoint, reloadToken])
 
-  return { data, error }
+  const reload = useCallback(() => setReloadToken((t) => t + 1), [])
+  return { data, error, reload }
 }
 
 function formatDate(datetime: string): string {
@@ -244,6 +247,7 @@ export function RecordingsPage() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('date')
   // The recorded movie open in the player dialog, by its /recordings/movies/... path.
   const [playingMoviePath, setPlayingMoviePath] = useState<string | null>(null)
+  const closePlayer = useCallback(() => setPlayingMoviePath(null), [])
   const recorded = usePolledList<RecordingGroup>('/api/recordings')
   const scheduled = usePolledList<ScheduledItem>('/api/recordings/scheduled')
 
@@ -355,7 +359,14 @@ export function RecordingsPage() {
       </div>
 
       <Dialog open={playingMoviePath !== null} onOpenChange={(open) => !open && setPlayingMoviePath(null)}>
-        {playingMoviePath !== null && <RecordingPlayerDialog key={playingMoviePath} moviePath={playingMoviePath} />}
+        {playingMoviePath !== null && (
+          <RecordingPlayerDialog
+            key={playingMoviePath}
+            moviePath={playingMoviePath}
+            onChanged={recorded.reload}
+            onEmpty={closePlayer}
+          />
+        )}
       </Dialog>
     </div>
   )

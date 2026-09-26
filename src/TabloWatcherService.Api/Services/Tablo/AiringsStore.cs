@@ -177,6 +177,12 @@ public partial class AiringsStore : IAiringsStore
             .ToList();
     }
 
+    public Airing? FindAiring(string parentGuidePath, DateTime datetime) =>
+        _snapshot.AiringsByPath.Values.FirstOrDefault(a =>
+            a.AiringDetails.Datetime == datetime
+            && (a.SeriesPath == parentGuidePath || a.MoviePath == parentGuidePath
+                || a.SportPath == parentGuidePath || a.ProgramPath == parentGuidePath));
+
     public Airing? GetAiring(string airingPath) => _snapshot.AiringsByPath.GetValueOrDefault(airingPath);
 
     public IReadOnlyList<Airing> GetMovieAirings(string moviePath) =>

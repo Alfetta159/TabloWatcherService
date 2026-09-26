@@ -59,6 +59,15 @@ public interface IRecordingsStore
 
     void Replace(IReadOnlyList<RecordedAiring> recordings, RecordingParents parents);
 
+    /// <summary>Adds or replaces one recording (e.g. re-read after it was stopped), keeping the rest.</summary>
+    void Upsert(RecordedAiring recording);
+
+    /// <summary>Drops one recording (e.g. after it was deleted), keeping the rest.</summary>
+    void Remove(string recordingPath);
+
+    /// <summary>The guide path of the series/movie/sport/program a recording belongs to, if known.</summary>
+    string? GuidePathOf(RecordedAiring recording);
+
     IReadOnlyList<RecordingGroup> GetGroups();
 }
 
@@ -86,6 +95,23 @@ public class RecordingsStore : IRecordingsStore
             parents,
             Group(recordings, parents));
         LastUpdated = DateTimeOffset.UtcNow;
+    }
+
+    // Both rebuild the snapshot from the current one, so a concurrent full refresh may win or
+    // lose the race - harmless, since it reads the device's own current state anyway.
+    public void Upsert(RecordedAiring recording) =>
+        Replace([.. _snapshot.Recordings.Values.Where(r => r.Path != recording.Path), recording], _snapshot.Parents);
+
+    public void Remove(string recordingPath) =>
+        Replace([.. _snapshot.Recordings.Values.Where(r => r.Path != recordingPath)], _snapshot.Parents);
+
+    public string? GuidePathOf(RecordedAiring recording)
+    {
+        var parents = _snapshot.Parents;
+        return (recording.SeriesPath is { } series ? parents.Series.GetValueOrDefault(series)?.GuidePath : null)
+            ?? (recording.MoviePath is { } movie ? parents.Movies.GetValueOrDefault(movie)?.GuidePath : null)
+            ?? (recording.SportPath is { } sport ? parents.Sports.GetValueOrDefault(sport)?.GuidePath : null)
+            ?? (recording.ProgramPath is { } program ? parents.Programs.GetValueOrDefault(program)?.GuidePath : null);
     }
 
     // Series and programs group their recordings into one card, like the Tablo apps do;

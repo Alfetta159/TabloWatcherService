@@ -80,6 +80,11 @@ public interface ITabloDeviceClient
     [Post("/{**recordingPath}/watch")]
     Task<ApiResponse<WatchInfo>> WatchRecordingAsync(string recordingPath);
 
+    // Deletes a recording from the device's disk (e.g. "recordings/movies/airings/123", no
+    // leading slash). Irreversible; answers 204 No Content.
+    [Delete("/{**recordingPath}")]
+    Task<IApiResponse> DeleteRecordingAsync(string recordingPath);
+
     // Schedules (true) or cancels (false) a recording of one airing - a series episode, movie
     // airing or sports event - by PATCHing the airing's own path (e.g.
     // "guide/movies/airings/123", no leading slash: "**" keeps its slashes unescaped). The

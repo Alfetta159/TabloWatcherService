@@ -7,6 +7,8 @@ public class GuideProgram
     public int ObjectId { get; set; }
     public string Path { get; set; } = string.Empty;
     public ProgramDetails Program { get; set; } = new();
+    // Set on the /recordings/... copy of this object: the guide object it was recorded from.
+    public string? GuidePath { get; set; }
 }
 
 public class ProgramDetails

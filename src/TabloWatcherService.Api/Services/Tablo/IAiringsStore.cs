@@ -113,6 +113,12 @@ public interface IAiringsStore
     /// </summary>
     IReadOnlyList<ScheduledAiring> GetScheduledAirings(DateTime now);
 
+    /// <summary>
+    /// The guide airing of a series/movie/sport/program (by its guide path) that starts at
+    /// <paramref name="datetime"/> - e.g. the airing a recording is being made from.
+    /// </summary>
+    Airing? FindAiring(string parentGuidePath, DateTime datetime);
+
     /// <summary>An airing in the guide by its path, or null if the guide doesn't have it.</summary>
     Airing? GetAiring(string airingPath);
 
