@@ -1,3 +1,4 @@
+using TabloWatcherService.Api.Models;
 using TabloWatcherService.Api.Services;
 using TabloWatcherService.Api.Services.Tablo;
 
@@ -37,6 +38,11 @@ public class SportsController(IAiringsStore store, IBlockedTagsStore blockedTags
                         sport = sportTitle,
                         description = airing.Event?.Description,
                         venue = airing.Event?.Venue,
+                        teams = (airing.Event?.Teams ?? []).Select(t => new
+                        {
+                            name = t.Name,
+                            isHome = t.TeamId == airing.Event?.HomeTeamId,
+                        }),
                         live = airing.Qualifiers.Contains("live"),
                         datetime = airing.AiringDetails.Datetime,
                         duration = airing.AiringDetails.Duration,
@@ -46,6 +52,8 @@ public class SportsController(IAiringsStore store, IBlockedTagsStore blockedTags
                         coverImageId = e.Sport?.CoverImage?.ImageId,
                         backgroundImageId = e.Sport?.BackgroundImage?.ImageId,
                         channel = UpcomingResponses.Channel(airing.AiringDetails.Channel),
+                        schedule = UpcomingResponses.Schedule(airing.Schedule),
+                        recordingState = AiringSchedule.Summarize([airing]),
                     };
                 }),
         });

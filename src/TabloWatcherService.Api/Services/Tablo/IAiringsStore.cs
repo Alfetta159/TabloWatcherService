@@ -38,7 +38,9 @@ public record UpcomingTitle<TDetails>(
     string Path,
     string Title,
     TDetails? Details,
-    IReadOnlyList<UpcomingChannel> Channels)
+    IReadOnlyList<UpcomingChannel> Channels,
+    // Every airing that hasn't ended, soonest first.
+    IReadOnlyList<Airing> Airings)
     where TDetails : class;
 
 /// <summary>One channel a title is coming up on: its soonest airing there and how many there are.</summary>
@@ -95,6 +97,21 @@ public interface IAiringsStore
 
     /// <summary>Sports event airings that haven't ended by <paramref name="now"/>, soonest first.</summary>
     IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now);
+
+    /// <summary>One movie (by its path, e.g. "/guide/movies/123") as in <see cref="GetUpcomingMovies"/>, or null if it has no upcoming airings.</summary>
+    UpcomingTitle<MovieDetails>? GetUpcomingMovie(string moviePath, DateTime now);
+
+    /// <summary>An airing in the guide by its path, or null if the guide doesn't have it.</summary>
+    Airing? GetAiring(string airingPath);
+
+    /// <summary>Every airing of a movie in the guide, past or upcoming.</summary>
+    IReadOnlyList<Airing> GetMovieAirings(string moviePath);
+
+    /// <summary>
+    /// Records a schedule change the device has confirmed (see ITabloDeviceClient
+    /// .SetAiringScheduledAsync), so it shows right away instead of at the next refresh.
+    /// </summary>
+    void UpdateSchedule(string airingPath, AiringSchedule schedule);
 
     /// <summary>
     /// Every genre appearing on any series currently in the guide, alphabetized -

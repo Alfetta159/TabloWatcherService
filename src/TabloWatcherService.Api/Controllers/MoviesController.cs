@@ -1,3 +1,4 @@
+using TabloWatcherService.Api.Models;
 using TabloWatcherService.Api.Services;
 using TabloWatcherService.Api.Services.Tablo;
 
@@ -37,7 +38,43 @@ public class MoviesController(IAiringsStore store, IBlockedTagsStore blockedTags
                     coverImageId = m.Details?.CoverImage?.ImageId,
                     backgroundImageId = m.Details?.BackgroundImage?.ImageId,
                     channels = m.Channels.Select(UpcomingResponses.Channel),
+                    // "scheduled"/"conflict" if any upcoming airing is, for the card's pill.
+                    recordingState = AiringSchedule.Summarize(m.Airings),
                 }),
+        });
+    }
+
+    /// <summary>
+    /// One movie's full details and every upcoming airing, with whether each is set to
+    /// record - for the Movies page's detail dialog.
+    /// </summary>
+    [HttpGet("{movieId:int}")]
+    public IActionResult GetById(int movieId)
+    {
+        var movie = store.GetUpcomingMovie($"/guide/movies/{movieId}", DateTime.UtcNow);
+        if (movie is null)
+        {
+            return NotFound();
+        }
+
+        var details = movie.Details;
+        return Ok(new
+        {
+            path = movie.Path,
+            title = movie.Title,
+            description = details?.Plot,
+            genres = details?.Genres ?? [],
+            releaseYear = details?.ReleaseYear is > 0 ? details.ReleaseYear : (int?)null,
+            filmRating = details?.FilmRating,
+            starRating = StarRating(details?.QualityRating),
+            runtime = details?.OriginalRuntime is > 0 ? details.OriginalRuntime : (int?)null,
+            cast = details?.Cast ?? [],
+            directors = details?.Directors ?? [],
+            thumbnailImageId = details?.ThumbnailImage?.ImageId,
+            coverImageId = details?.CoverImage?.ImageId,
+            backgroundImageId = details?.BackgroundImage?.ImageId,
+            recordingState = AiringSchedule.Summarize(movie.Airings),
+            airings = movie.Airings.Select(UpcomingResponses.Airing),
         });
     }
 
