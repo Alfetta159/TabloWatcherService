@@ -163,6 +163,7 @@ export function SportsPage() {
       toCard={sportsEventCard}
       placeholderIcon={Trophy}
       showAiringCount={false}
+      defaultSort="airDate"
     />
   )
 }

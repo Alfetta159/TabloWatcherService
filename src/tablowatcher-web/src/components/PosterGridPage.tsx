@@ -152,7 +152,7 @@ function PosterCard({
 }
 
 interface PosterGridPageProps<T> {
-  // An upcoming-list endpoint returning { updatedAt, items }, already in display order.
+  // An upcoming-list endpoint returning { updatedAt, items } (the page sorts them itself).
   endpoint: string
   // e.g. ['show', 'shows'], for "12 shows coming up".
   noun: [singular: string, plural: string]
@@ -161,6 +161,21 @@ interface PosterGridPageProps<T> {
   // Off where every item is a single airing (sports events), so the count is always 1.
   showAiringCount?: boolean
   facets?: Facet[]
+  // The initial order; the Sort dropdown can change it.
+  defaultSort?: SortOrder
+}
+
+export type SortOrder = 'title' | 'airDate'
+
+const SORT_LABELS: Record<SortOrder, string> = { title: 'Title', airDate: 'Air date' }
+
+// Sorts "The Office" with the Os, matching the server's own title order (AiringsStore).
+function sortableTitle(title: string): string {
+  return title.replace(/^(the|a|an)\s+(?=\S)/i, '')
+}
+
+function compareTitles(a: PosterCardData, b: PosterCardData): number {
+  return sortableTitle(a.title).localeCompare(sortableTitle(b.title), undefined, { sensitivity: 'base' })
 }
 
 const NO_FACETS: Facet[] = []
@@ -177,7 +192,9 @@ export function PosterGridPage<T>({
   placeholderIcon,
   showAiringCount = true,
   facets = NO_FACETS,
+  defaultSort = 'title',
 }: PosterGridPageProps<T>) {
+  const [sortOrder, setSortOrder] = useState<SortOrder>(defaultSort)
   const [data, setData] = useState<UpcomingResponse<T> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [channelFilter, setChannelFilter] = useState(ALL_CHANNELS)
@@ -262,8 +279,15 @@ export function PosterGridPage<T>({
             const selected = facetSelections[facet.key]
             return !selected || selected === facetValue(card, facet)
           }),
+        )
+        // By air date means the soonest airing on the channels still showing (so it follows
+        // the Channel filter), then by title for airings at the same time.
+        .sort((a, b) =>
+          sortOrder === 'airDate'
+            ? Date.parse(a.channels[0].nextAiring) - Date.parse(b.channels[0].nextAiring) || compareTitles(a.card, b.card)
+            : compareTitles(a.card, b.card),
         ),
-    [cards, channelFilter, tagFilters.includeTags, facets, facetSelections],
+    [cards, channelFilter, tagFilters.includeTags, facets, facetSelections, sortOrder],
   )
 
   const filterId = `${endpoint}-channel`
@@ -285,6 +309,22 @@ export function PosterGridPage<T>({
                 <option key={c.objectId} value={String(c.objectId)}>
                   {channelNumber(c)} {c.callSign}
                   {c.network && c.network !== c.callSign ? ` (${c.network})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor={`${endpoint}-sort`}>Sort by</Label>
+            <select
+              id={`${endpoint}-sort`}
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+              className={`${SELECT_CLASS_NAME} min-w-32`}
+            >
+              {Object.entries(SORT_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
                 </option>
               ))}
             </select>
