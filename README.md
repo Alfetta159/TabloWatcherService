@@ -176,8 +176,25 @@ It builds the app, creates a `tablowatcher` system user if needed, copies the bu
 and starts the service so it also starts at boot. Run it again whenever you want to update
 the service to your latest code.
 
-The service listens on port **8080** (browse to `http://<host>:8080/`), set by the unit
-file, so it can run alongside a development session on 5080.
+The service listens on port **80**, so there's no port to type: browse to
+`http://<hostname>.local/`, where `<hostname>` is the machine's name. The `.local` name is
+advertised on your network by `avahi-daemon`, which most Linux desktops already run
+(`sudo apt install avahi-daemon` if not). It works from macOS, iOS, Windows 10+ and most
+Linux machines, but not every Android version. The IP address also works:
+`http://<ip-address>/`.
+
+For a friendlier name, rename the machine as you install:
+
+```bash
+deploy/install.sh --hostname tabloid   # then browse to http://tabloid.local/
+```
+
+Renaming changes the name everything else knows the machine by too (SSH, other services),
+so the script only does it when asked. Other ways to get a friendly name include a local
+hostname set in your router or Pi-hole, e.g. `tabloid.lan`, pointed at the machine's
+(ideally reserved) IP address.
+
+The service doesn't clash with a development session, which uses port 5080.
 
 To do the same by hand:
 
@@ -204,7 +221,9 @@ The app calls `UseSystemd()` in [Program.cs](src/TabloWatcherService.Api/Program
 so systemd gets proper start/stop notifications and journal-integrated logging.
 
 To use a different port, change the `Kestrel__Endpoints__Http__Url` line in the unit file
-and re-run `deploy/install.sh`.
+and re-run `deploy/install.sh`. Ports below 1024 work because the unit grants the service
+user only the `CAP_NET_BIND_SERVICE` capability (`AmbientCapabilities`). The service still
+doesn't run as root.
 
 ### Windows (Windows Service)
 
@@ -227,17 +246,20 @@ just running `dotnet run`, so the same build works everywhere.
 ### LAN access / firewall
 
 Whichever OS you run it on, opening the service to the LAN means opening its port
-in the OS firewall (8080 for the Linux service, 5080 by default otherwise):
+in the OS firewall (80 for the Linux service, 5080 by default otherwise):
 
 ```bash
 # Linux (ufw example)
-sudo ufw allow 8080/tcp
+sudo ufw allow 80/tcp
 ```
 
 ```powershell
 # Windows
 New-NetFirewallRule -DisplayName "TabloWatcherService" -Direction Inbound -Protocol TCP -LocalPort 5080 -Action Allow
 ```
+
+Keep it on your LAN: **don't port-forward it or otherwise expose it to the internet.** The
+app has no login, and it can schedule, stop and delete recordings on your Tablo.
 
 ## API
 
@@ -270,8 +292,12 @@ commented out.
 - **A channel won't play**: the browser plays the stream directly from the Tablo, so the
   device's IP must be reachable from the machine running the browser, not just from the
   server. All tuners being busy can also make tuning slow or fail.
-- **The service won't start**: another process may already be using its port (8080 for the
-  Linux service). Stop it or change the service's port (see above).
+- **The service won't start**: another process may already be using its port (80 for the
+  Linux service, e.g. another web server). `deploy/install.sh` checks for this before
+  installing. Stop that program or change the service's port (see above).
+- **`http://<hostname>.local/` doesn't load**: check that `avahi-daemon` is running on the
+  server (`systemctl status avahi-daemon`) and that the firewall allows port 80. Some
+  Android versions can't resolve `.local` names; use the IP address there.
 
 ## Tablo Legacy API
 
