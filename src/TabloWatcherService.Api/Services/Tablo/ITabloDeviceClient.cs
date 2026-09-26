@@ -51,6 +51,9 @@ public interface ITabloDeviceClient
     [Get("/guide/movies/{movieId}")]
     Task<ApiResponse<GuideMovie>> GetGuideMovieAsync(int movieId);
 
+    [Get("/recordings/airings")]
+    Task<ApiResponse<string[]>> GetRecordedAiringsAsync();
+
     [Get("/guide/airings")]
     Task<ApiResponse<string[]>> GetGuideAiringsAsync();
 
@@ -70,6 +73,17 @@ public interface ITabloDeviceClient
     // not JSON, so it bypasses the configured JSON content serializer entirely.
     [Get("/images/{imageId}")]
     Task<HttpResponseMessage> GetImageAsync(int imageId);
+
+    // Starts playback of a recording (e.g. "recordings/movies/airings/123", no leading
+    // slash). Like WatchChannelAsync, the playlist_url it returns is on the device's CORS-open
+    // streaming server, so the browser plays it directly. Needs no tuner.
+    [Post("/{**recordingPath}/watch")]
+    Task<ApiResponse<WatchInfo>> WatchRecordingAsync(string recordingPath);
+
+    // Deletes a recording from the device's disk (e.g. "recordings/movies/airings/123", no
+    // leading slash). Irreversible; answers 204 No Content.
+    [Delete("/{**recordingPath}")]
+    Task<IApiResponse> DeleteRecordingAsync(string recordingPath);
 
     // Schedules (true) or cancels (false) a recording of one airing - a series episode, movie
     // airing or sports event - by PATCHing the airing's own path (e.g.

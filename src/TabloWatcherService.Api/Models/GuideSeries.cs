@@ -11,6 +11,8 @@ public class GuideSeries
     public ShowCounts ShowCounts { get; set; } = new();
     public KeepRule Keep { get; set; } = new();
     public string? RecordingsPath { get; set; }
+    // Set on the /recordings/... copy of this object: the guide object it was recorded from.
+    public string? GuidePath { get; set; }
 }
 
 public class SeriesSchedule
