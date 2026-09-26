@@ -1,12 +1,14 @@
 import { Film, MonitorPlay, Trophy } from 'lucide-react'
+import { MovieDetailDialog, SportsEventDetailDialog, type SportsEventDetail } from '@/components/DetailDialogs'
 import {
   PosterGridPage,
   type Artwork,
   type Facet,
-  type ChannelInfo,
   type PosterCardData,
   type UpcomingChannel,
 } from '@/components/PosterGridPage'
+import { formatRating, formatStars } from '@/lib/format'
+import type { RecordingState } from '@/lib/recording'
 
 interface TvShow extends Artwork {
   path: string
@@ -27,32 +29,16 @@ interface Movie extends Artwork {
   // 1-4 in half steps (Gracenote's critic rating), or null if unrated.
   starRating: number | null
   channels: UpcomingChannel[]
+  recordingState: RecordingState | null
 }
 
-interface SportsEvent extends Artwork {
-  path: string
-  title: string
-  sport: string
-  description: string | null
-  venue: string | null
-  live: boolean
-  datetime: string
-  duration: number
-  genres: string[]
-  channel: ChannelInfo
-}
+type SportsEvent = SportsEventDetail
 
 // Prefer the portrait poster; the other images are landscape, but better than nothing.
 function posterImageId(artwork: Artwork): number | null {
   return artwork.thumbnailImageId ?? artwork.coverImageId ?? artwork.backgroundImageId
 }
 
-// Ratings come back lowercase - "r", "pg-13", "nc-17" - with TV ratings undashed ("tvpg",
-// "tv14"), so "tvpg" -> "TV-PG" and "pg-13" -> "PG-13".
-function formatRating(rating: string | null): string | null {
-  if (!rating) return null
-  return rating.toUpperCase().replace(/^TV(?!-)/, 'TV-')
-}
 
 // Movie ratings first, mildest to strictest, then TV ratings the same way; anything
 // unexpected sorts after these.
@@ -66,10 +52,6 @@ function compareRatings(a: string, b: string): number {
   return rank(a) - rank(b) || a.localeCompare(b)
 }
 
-// 3.5 -> "★★★½"
-function formatStars(stars: number): string {
-  return '★'.repeat(Math.floor(stars)) + (stars % 1 ? '½' : '')
-}
 
 // Module-level (like the toCard functions below) so they're stable across renders.
 const RATING_FACET: Facet = { key: 'rating', label: 'Rating', placeholder: 'All ratings', compare: compareRatings }
@@ -115,6 +97,7 @@ function movieCard(movie: Movie): PosterCardData {
       rating: formatRating(movie.filmRating),
       stars: movie.starRating == null ? null : String(movie.starRating),
     },
+    recordingState: movie.recordingState,
   }
 }
 
@@ -128,7 +111,17 @@ function sportsEventCard(event: SportsEvent): PosterCardData {
     imageId: posterImageId(event),
     channels: [{ ...event.channel, nextAiring: event.datetime, airingCount: 1 }],
     flag: event.live ? 'Live' : null,
+    recordingState: event.recordingState,
   }
+}
+
+// Keyed by path so switching cards starts each dialog fresh.
+function movieDetail(movie: Movie, onChanged: () => void) {
+  return <MovieDetailDialog key={movie.path} path={movie.path} onChanged={onChanged} />
+}
+
+function sportsEventDetail(event: SportsEvent, onChanged: () => void) {
+  return <SportsEventDetailDialog key={event.path} event={event} onChanged={onChanged} />
 }
 
 export function TvShowsPage() {
@@ -151,6 +144,7 @@ export function MoviesPage() {
       toCard={movieCard}
       placeholderIcon={Film}
       facets={MOVIE_FACETS}
+      renderDetail={movieDetail}
     />
   )
 }
@@ -164,6 +158,7 @@ export function SportsPage() {
       placeholderIcon={Trophy}
       showAiringCount={false}
       defaultSort="airDate"
+      renderDetail={sportsEventDetail}
     />
   )
 }

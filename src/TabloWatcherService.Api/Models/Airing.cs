@@ -18,6 +18,40 @@ public class Airing
     public EpisodeInfo? Episode { get; set; }
     public MovieAiringInfo? MovieAiring { get; set; }
     public SportEventInfo? Event { get; set; }
+
+    // Whether this airing is set to record. Replaced wholesale (never mutated field by field)
+    // when a recording is scheduled or cancelled - see IAiringsStore.UpdateSchedule.
+    public AiringSchedule? Schedule { get; set; }
+}
+
+public class AiringSchedule
+{
+    // Seen on real devices: "none", "scheduled", "conflict", "skipped". Tablo's (unofficial)
+    // docs also mention "conflicted", and one in progress is presumably "recording".
+    public string State { get; set; } = "none";
+    // "user" for a one-off recording, "show" when a series/movie rule scheduled it.
+    public string? Qualifier { get; set; }
+    // For a skipped airing: e.g. "duplicate" (skip_detail "already_recorded") or "channel".
+    public string? SkipReason { get; set; }
+    public string? SkipDetail { get; set; }
+
+    public bool IsConflict => State is "conflict" or "conflicted";
+
+    // Going to be (or being) recorded - scheduled and not in conflict.
+    public bool IsScheduled => State is "scheduled" or "recording";
+
+    /// <summary>
+    /// What a card's recording pill should say about a set of airings: "conflict" if any
+    /// can't be recorded for lack of a tuner, else "scheduled" if any will be recorded, else
+    /// null (nothing to show).
+    /// </summary>
+    public static string? Summarize(IEnumerable<Airing> airings)
+    {
+        var schedules = airings.Select(a => a.Schedule).OfType<AiringSchedule>().ToList();
+        return schedules.Any(s => s.IsConflict) ? "conflict"
+            : schedules.Any(s => s.IsScheduled) ? "scheduled"
+            : null;
+    }
 }
 
 public class AiringDetails

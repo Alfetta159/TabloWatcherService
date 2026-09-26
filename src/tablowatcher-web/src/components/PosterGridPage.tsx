@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useState, type ComponentType, type KeyboardEvent, type ReactNode } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { Dialog } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { RecordingPill } from '@/components/Recording'
 import { TagFilterControls } from '@/components/TagFilterControls'
 import { useTagFilters } from '@/hooks/useTagFilters'
+import type { RecordingState } from '@/lib/recording'
 
 // A channel as the TV shows/movies/sports endpoints return it (UpcomingResponses on the server).
 export interface ChannelInfo {
@@ -41,6 +44,8 @@ export interface PosterCardData {
   channels: UpcomingChannel[]
   // Highlighted on the poster, e.g. "Live".
   flag?: string | null
+  // Pill on the poster: an airing is set to record, or is in conflict.
+  recordingState?: RecordingState | null
   // This card's value for each of the page's facets (see Facet), keyed by Facet.key; null
   // or missing means it has none (e.g. an unrated movie).
   facets?: Record<string, string | null>
@@ -94,18 +99,35 @@ function PosterCard({
   channels,
   placeholderIcon: PlaceholderIcon,
   showAiringCount,
+  onOpen,
 }: {
   card: PosterCardData
   channels: UpcomingChannel[]
   placeholderIcon: ComponentType<{ className?: string }>
   showAiringCount: boolean
+  // Makes the card clickable (and keyboard-activatable), opening its detail dialog.
+  onOpen?: () => void
 }) {
   const [imageFailed, setImageFailed] = useState(false)
   const next = channels[0]
   const airingCount = channels.reduce((sum, c) => sum + c.airingCount, 0)
 
   return (
-    <Card className="gap-0 overflow-hidden py-0" title={card.description ?? undefined}>
+    <Card
+      className={`gap-0 overflow-hidden py-0 ${onOpen ? 'hover:ring-primary/50 focus-visible:ring-primary cursor-pointer transition-shadow outline-none hover:ring-2 focus-visible:ring-2' : ''}`}
+      title={card.description ?? undefined}
+      {...(onOpen && {
+        role: 'button',
+        tabIndex: 0,
+        onClick: onOpen,
+        onKeyDown: (e: KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onOpen()
+          }
+        },
+      })}
+    >
       <div className="bg-muted relative flex aspect-[2/3] items-center justify-center">
         {card.imageId != null && !imageFailed ? (
           <img
@@ -122,6 +144,7 @@ function PosterCard({
           </div>
         )}
         {card.flag && <Badge className="absolute top-2 left-2 shadow">{card.flag}</Badge>}
+        {card.recordingState && <RecordingPill state={card.recordingState} className="absolute top-2 right-2" />}
       </div>
       <div className="space-y-1 p-3 text-sm">
         <p className="line-clamp-2 font-medium leading-snug">{card.title}</p>
@@ -163,6 +186,10 @@ interface PosterGridPageProps<T> {
   facets?: Facet[]
   // The initial order; the Sort dropdown can change it.
   defaultSort?: SortOrder
+  // When given, clicking a card opens a dialog with this content (a DialogContent) for its
+  // item. `onChanged` re-reads the list - e.g. after a recording is scheduled, so the card's
+  // pill is right once the dialog closes.
+  renderDetail?: (item: T, onChanged: () => void) => ReactNode
 }
 
 export type SortOrder = 'title' | 'airDate'
@@ -193,7 +220,12 @@ export function PosterGridPage<T>({
   showAiringCount = true,
   facets = NO_FACETS,
   defaultSort = 'title',
+  renderDetail,
 }: PosterGridPageProps<T>) {
+  // The card whose detail dialog is open, by PosterCardData.key.
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  // Bumped to re-read the list right away rather than at the next poll.
+  const [reloadToken, setReloadToken] = useState(0)
   const [sortOrder, setSortOrder] = useState<SortOrder>(defaultSort)
   const [data, setData] = useState<UpcomingResponse<T> | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -234,9 +266,16 @@ export function PosterGridPage<T>({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [endpoint])
+  }, [endpoint, reloadToken])
 
   const cards = useMemo(() => (data?.items ?? []).map(toCard), [data, toCard])
+
+  // Looked up by key, so an open dialog shows the item's latest data after a reload.
+  const selectedItem = useMemo(() => {
+    if (selectedKey === null) return null
+    const index = cards.findIndex((card) => card.key === selectedKey)
+    return index === -1 ? null : (data?.items[index] ?? null)
+  }, [cards, data, selectedKey])
 
   // Every channel any card is coming up on, for the filter.
   const channelOptions = useMemo(() => {
@@ -382,9 +421,16 @@ export function PosterGridPage<T>({
             channels={channels}
             placeholderIcon={placeholderIcon}
             showAiringCount={showAiringCount}
+            onOpen={renderDetail && (() => setSelectedKey(card.key))}
           />
         ))}
       </div>
+
+      {renderDetail && (
+        <Dialog open={selectedItem !== null} onOpenChange={(open) => !open && setSelectedKey(null)}>
+          {selectedItem !== null && renderDetail(selectedItem, () => setReloadToken((t) => t + 1))}
+        </Dialog>
+      )}
     </div>
   )
 }

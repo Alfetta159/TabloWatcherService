@@ -31,11 +31,17 @@ public partial class AiringsStore : IAiringsStore
         IReadOnlyList<SearchEntry> SearchEntries,
         IReadOnlyList<TitleAirings<SeriesDetails>> Series,
         IReadOnlyList<TitleAirings<MovieDetails>> Movies,
-        IReadOnlyList<UpcomingSportsEvent> SportsEvents);
+        IReadOnlyList<UpcomingSportsEvent> SportsEvents,
+        IReadOnlyDictionary<string, Airing> AiringsByPath,
+        IReadOnlyDictionary<string, TitleAirings<MovieDetails>> MoviesByPath);
 
     // Assigned wholesale by Replace(), never mutated in place, so a concurrent reader
-    // always sees one complete, internally-consistent snapshot with no locking needed.
-    private volatile Snapshot _snapshot = new([], [], [], [], []);
+    // always sees one complete, internally-consistent snapshot with no locking needed. (The
+    // one exception is an airing's Schedule - see UpdateSchedule.)
+    private volatile Snapshot _snapshot = new(
+        [], [], [], [], [],
+        new Dictionary<string, Airing>(),
+        new Dictionary<string, TitleAirings<MovieDetails>>());
 
     public DateTimeOffset? LastUpdated { get; private set; }
 
@@ -72,7 +78,14 @@ public partial class AiringsStore : IAiringsStore
             .Select(a => new UpcomingSportsEvent(a, SportFor(a, details)))
             .ToList();
 
-        _snapshot = new Snapshot(channels, searchEntries, seriesAirings, movieAirings, sportsEvents);
+        _snapshot = new Snapshot(
+            channels,
+            searchEntries,
+            seriesAirings,
+            movieAirings,
+            sportsEvents,
+            airings.DistinctBy(a => a.Path).ToDictionary(a => a.Path),
+            movieAirings.ToDictionary(m => m.Path));
         LastUpdated = DateTimeOffset.UtcNow;
     }
 
@@ -140,6 +153,26 @@ public partial class AiringsStore : IAiringsStore
 
     public IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now) =>
         _snapshot.SportsEvents.Where(e => HasNotEnded(e.Airing, now)).ToList();
+
+    public UpcomingTitle<MovieDetails>? GetUpcomingMovie(string moviePath, DateTime now) =>
+        _snapshot.MoviesByPath.TryGetValue(moviePath, out var movie) ? Upcoming([movie], now).FirstOrDefault() : null;
+
+    public Airing? GetAiring(string airingPath) => _snapshot.AiringsByPath.GetValueOrDefault(airingPath);
+
+    public IReadOnlyList<Airing> GetMovieAirings(string moviePath) =>
+        _snapshot.MoviesByPath.TryGetValue(moviePath, out var movie) ? movie.Airings : [];
+
+    // Swapping one reference on an airing that every list in the snapshot shares, rather than
+    // rebuilding the snapshot: a reader sees either the old schedule or the new one, never a
+    // mix, and the change shows everywhere (grid, search, pills) at once. The next full
+    // refresh replaces it with whatever the device reports anyway.
+    public void UpdateSchedule(string airingPath, AiringSchedule schedule)
+    {
+        if (_snapshot.AiringsByPath.TryGetValue(airingPath, out var airing))
+        {
+            airing.Schedule = schedule;
+        }
+    }
 
     public IReadOnlyList<string> GetSeriesGenres() => GenresOf(_snapshot.Series.Select(s => s.Details?.Genres));
 
@@ -212,7 +245,8 @@ public partial class AiringsStore : IAiringsStore
                         group.First().AiringDetails.Datetime,
                         group.Count()))
                     .OrderBy(c => c.NextAiring)
-                    .ToList()))
+                    .ToList(),
+                t.Airings.Where(a => HasNotEnded(a, now)).ToList()))
             .Where(t => t.Channels.Count > 0)
             .ToList();
 

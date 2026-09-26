@@ -29,4 +29,24 @@ internal static class UpcomingResponses
         nextAiring = channel.NextAiring,
         airingCount = channel.AiringCount,
     };
+
+    public static object? Schedule(AiringSchedule? schedule) => schedule is null ? null : new
+    {
+        state = schedule.State,
+        qualifier = schedule.Qualifier,
+        skipReason = schedule.SkipReason,
+        skipDetail = schedule.SkipDetail,
+    };
+
+    // One airing as a detail view lists it: when, where, and whether it'll be recorded.
+    public static object Airing(Airing airing) => new
+    {
+        path = airing.Path,
+        datetime = airing.AiringDetails.Datetime,
+        duration = airing.AiringDetails.Duration,
+        live = airing.Qualifiers.Contains("live"),
+        isNew = airing.Qualifiers.Contains("new"),
+        channel = Channel(airing.AiringDetails.Channel),
+        schedule = Schedule(airing.Schedule),
+    };
 }

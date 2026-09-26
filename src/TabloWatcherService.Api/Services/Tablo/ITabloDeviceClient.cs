@@ -71,6 +71,13 @@ public interface ITabloDeviceClient
     [Get("/images/{imageId}")]
     Task<HttpResponseMessage> GetImageAsync(int imageId);
 
+    // Schedules (true) or cancels (false) a recording of one airing - a series episode, movie
+    // airing or sports event - by PATCHing the airing's own path (e.g.
+    // "guide/movies/airings/123", no leading slash: "**" keeps its slashes unescaped). The
+    // device answers with the whole airing, its "schedule" updated.
+    [Patch("/{**airingPath}")]
+    Task<ApiResponse<Airing>> SetAiringScheduledAsync(string airingPath, [Body] ScheduleRequest request);
+
     // Starts (or renews) a live stream for this channel and allocates a tuner; the
     // playlist_url it returns points directly at the device's separate streaming server
     // (a different port than this JSON API) and is CORS-open, so the frontend plays it
@@ -78,3 +85,6 @@ public interface ITabloDeviceClient
     [Post("/guide/channels/{channelId}/watch")]
     Task<ApiResponse<WatchInfo>> WatchChannelAsync(int channelId);
 }
+
+// Body for ITabloDeviceClient.SetAiringScheduledAsync - serialized as {"scheduled": true}.
+public record ScheduleRequest(bool Scheduled);
