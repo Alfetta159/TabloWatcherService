@@ -10,8 +10,13 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/recordings")]
-public class RecordingsController(IRecordingsStore recordings, IAiringsStore airings) : ControllerBase
+public class RecordingsController(
+    IRecordingsStore recordings,
+    IAiringsStore airings,
+    ICurrentTabloDeviceResolver deviceResolver) : ControllerBase
 {
+    public record WatchRequest(string Path);
+
     /// <summary>
     /// One item per card: a series or program with all its recorded episodes/airings, or a
     /// single recorded movie or sports event.
@@ -86,6 +91,94 @@ public class RecordingsController(IRecordingsStore recordings, IAiringsStore air
             };
         }),
     });
+
+    /// <summary>
+    /// A recorded movie's full details and every recording of it (newest first) - for the
+    /// Recordings page's movie player dialog.
+    /// </summary>
+    [HttpGet("movies/{movieId:int}")]
+    public IActionResult GetMovie(int movieId)
+    {
+        var path = $"/recordings/movies/{movieId}";
+        var group = recordings.GetGroups().FirstOrDefault(g => g.Key == path);
+        if (group is null)
+        {
+            return NotFound();
+        }
+
+        var movie = group.Movie;
+        var latest = group.Recordings[0];
+        return Ok(new
+        {
+            path,
+            title = group.Title,
+            description = movie?.Plot,
+            genres = movie?.Genres ?? [],
+            releaseYear = movie?.ReleaseYear is > 0 ? movie.ReleaseYear : latest.MovieAiring?.ReleaseYear,
+            filmRating = movie?.FilmRating ?? latest.MovieAiring?.FilmRating,
+            starRating = StarRatings.FromQualityRating(movie?.QualityRating ?? latest.MovieAiring?.QualityRating),
+            runtime = movie?.OriginalRuntime is > 0 ? movie.OriginalRuntime : (int?)null,
+            cast = movie?.Cast ?? [],
+            directors = movie?.Directors ?? [],
+            thumbnailImageId = movie?.ThumbnailImage?.ImageId,
+            coverImageId = movie?.CoverImage?.ImageId,
+            backgroundImageId = movie?.BackgroundImage?.ImageId,
+            recordings = group.Recordings.Select(r => new
+            {
+                path = r.Path,
+                recordedAt = r.AiringDetails.Datetime,
+                channel = UpcomingResponses.Channel(r.AiringDetails.Channel),
+                state = r.VideoDetails?.State,
+                // Seconds actually recorded.
+                duration = r.VideoDetails?.Duration ?? 0,
+                size = r.VideoDetails?.Size ?? 0,
+                width = r.VideoDetails?.Width ?? 0,
+                height = r.VideoDetails?.Height ?? 0,
+                watched = r.UserInfo?.Watched ?? false,
+                // Where playback last left off, in seconds.
+                position = r.UserInfo?.Position ?? 0,
+                snapshotImageId = r.SnapshotImage?.ImageId,
+            }),
+        });
+    }
+
+    /// <summary>
+    /// Starts playback of one recording. The browser plays the returned playlistUrl straight
+    /// from the device (see <see cref="ITabloDeviceClient.WatchRecordingAsync"/>).
+    /// </summary>
+    [HttpPost("watch")]
+    public async Task<IActionResult> Watch([FromBody] WatchRequest request)
+    {
+        // Only ever a recording the cache knows about - never an arbitrary device path.
+        if (!recordings.Recordings.ContainsKey(request.Path))
+        {
+            return NotFound();
+        }
+
+        var client = await deviceResolver.ResolveAsync();
+        if (client is null)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+
+        ApiResponse<WatchInfo> response;
+        try
+        {
+            response = await client.WatchRecordingAsync(request.Path.TrimStart('/'));
+        }
+        catch (HttpRequestException)
+        {
+            // The device's embedded server occasionally drops a request; the caller can retry.
+            return StatusCode(StatusCodes.Status502BadGateway);
+        }
+
+        if (!response.IsSuccessStatusCode || response.Content is null)
+        {
+            return response.ToErrorResult();
+        }
+
+        return Ok(new { playlistUrl = response.Content.PlaylistUrl });
+    }
 
     private static string? Subtitle(RecordingGroup group, RecordedAiring latest) => group.Kind switch
     {

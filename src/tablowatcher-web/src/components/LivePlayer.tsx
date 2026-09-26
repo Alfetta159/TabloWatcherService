@@ -8,6 +8,16 @@ interface LivePlayerProps {
   tuningLabel: string | null
   tuneError?: string | null
   className?: string
+  // Also plays recordings (see RecordingPlayerDialog), which need different wording and can
+  // resume partway through:
+  // Seconds into the stream to start at. Leave unset for live TV, to start at the live edge;
+  // a recording passes 0 to start at the beginning - even one still being recorded, whose
+  // stream otherwise looks live.
+  startAt?: number
+  // Shown until playback starts; defaults to "Tuning into {tuningLabel}".
+  loadingMessage?: string
+  // Prefixes a playback error; defaults to "Couldn't play this channel".
+  errorMessage?: string
 }
 
 // The playlist_url points directly at the Tablo device's separate streaming server (not
@@ -58,7 +68,15 @@ function play(video: HTMLVideoElement) {
   })
 }
 
-export function LivePlayer({ playlistUrl, tuningLabel, tuneError, className }: LivePlayerProps) {
+export function LivePlayer({
+  playlistUrl,
+  tuningLabel,
+  tuneError,
+  className,
+  startAt,
+  loadingMessage,
+  errorMessage = "Couldn't play this channel",
+}: LivePlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -71,7 +89,8 @@ export function LivePlayer({ playlistUrl, tuningLabel, tuneError, className }: L
     video.muted = audioSettings.muted
 
     if (Hls.isSupported()) {
-      const hls = new Hls()
+      // -1 is hls.js's default: the live edge for live streams, the start otherwise.
+      const hls = new Hls({ startPosition: startAt ?? -1 })
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) setError(data.details)
       })
@@ -84,19 +103,24 @@ export function LivePlayer({ playlistUrl, tuningLabel, tuneError, className }: L
 
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       const onError = () => setError(video.error?.message || `media error ${video.error?.code}`)
+      const onLoadedMetadata = () => {
+        if (startAt !== undefined) video.currentTime = startAt
+      }
       video.addEventListener('error', onError)
+      video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true })
       video.src = playlistUrl
       play(video)
 
       return () => {
         video.removeEventListener('error', onError)
+        video.removeEventListener('loadedmetadata', onLoadedMetadata)
         video.removeAttribute('src')
         video.load()
       }
     }
 
     setError('HLS playback is not supported in this browser')
-  }, [playlistUrl])
+  }, [playlistUrl, startAt])
 
   if (!tuningLabel) {
     return (
@@ -110,7 +134,9 @@ export function LivePlayer({ playlistUrl, tuningLabel, tuneError, className }: L
   if (shownError) {
     return (
       <div className={`flex items-center justify-center ${className ?? ''}`}>
-        <p className="p-4 text-center text-sm text-white/80">Couldn't play this channel: {shownError}</p>
+        <p className="p-4 text-center text-sm text-white/80">
+          {errorMessage}: {shownError}
+        </p>
       </div>
     )
   }
@@ -131,7 +157,7 @@ export function LivePlayer({ playlistUrl, tuningLabel, tuneError, className }: L
       {!playing && (
         <div className="absolute inset-0 flex items-center justify-center gap-2 p-4 text-sm text-white/60">
           <LoaderCircle className="size-4 shrink-0 animate-spin" aria-hidden />
-          <span>Tuning into {tuningLabel}</span>
+          <span>{loadingMessage ?? `Tuning into ${tuningLabel}`}</span>
         </div>
       )}
     </div>

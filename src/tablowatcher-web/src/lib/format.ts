@@ -18,3 +18,23 @@ export function sortableTitle(title: string): string {
 export function compareTitles(a: string, b: string): number {
   return sortableTitle(a).localeCompare(sortableTitle(b), undefined, { sensitivity: 'base' })
 }
+
+// 6000 -> "1h 40m"
+export function formatDuration(seconds: number): string {
+  const minutes = Math.round(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`
+}
+
+// 3723 -> "1:02:03", 125 -> "2:05"
+export function formatClock(seconds: number): string {
+  const s = Math.floor(seconds % 60)
+  const m = Math.floor(seconds / 60) % 60
+  const h = Math.floor(seconds / 3600)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
+}
+
+export function formatSize(bytes: number): string {
+  return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`
+}

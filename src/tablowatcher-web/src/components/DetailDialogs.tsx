@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { AiringRow, RecordingPill } from '@/components/Recording'
 import type { ChannelInfo } from '@/components/PosterGridPage'
-import { formatRating, formatStars } from '@/lib/format'
+import { formatDuration, formatRating, formatStars } from '@/lib/format'
 import { recordingStateOf, type AiringSchedule, type RecordingState, type ScheduledAiring } from '@/lib/recording'
 
 // GET /api/movies/{id}.
@@ -49,12 +49,6 @@ export interface SportsEventDetail {
 
 function imageUrl(id: number | null): string | null {
   return id == null ? null : `/api/images/${id}`
-}
-
-function formatRuntime(seconds: number): string {
-  const minutes = Math.round(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-  return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`
 }
 
 // The dialog's shared frame: backdrop across the top, poster overlapping it, title and
@@ -182,7 +176,7 @@ export function MovieDetailDialog({ path, onChanged }: { path: string; onChanged
     movie.releaseYear,
     formatRating(movie.filmRating),
     movie.starRating && formatStars(movie.starRating),
-    movie.runtime && formatRuntime(movie.runtime),
+    movie.runtime && formatDuration(movie.runtime),
   ]
     .filter(Boolean)
     .join(' · ')

@@ -74,6 +74,12 @@ public interface ITabloDeviceClient
     [Get("/images/{imageId}")]
     Task<HttpResponseMessage> GetImageAsync(int imageId);
 
+    // Starts playback of a recording (e.g. "recordings/movies/airings/123", no leading
+    // slash). Like WatchChannelAsync, the playlist_url it returns is on the device's CORS-open
+    // streaming server, so the browser plays it directly. Needs no tuner.
+    [Post("/{**recordingPath}/watch")]
+    Task<ApiResponse<WatchInfo>> WatchRecordingAsync(string recordingPath);
+
     // Schedules (true) or cancels (false) a recording of one airing - a series episode, movie
     // airing or sports event - by PATCHing the airing's own path (e.g.
     // "guide/movies/airings/123", no leading slash: "**" keeps its slashes unescaped). The

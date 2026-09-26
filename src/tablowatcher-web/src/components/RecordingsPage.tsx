@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { CircleDot, Clapperboard } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { Dialog } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RecordingPill } from '@/components/Recording'
+import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog'
 import type { ChannelInfo } from '@/components/PosterGridPage'
-import { compareTitles } from '@/lib/format'
+import { compareTitles, formatSize } from '@/lib/format'
 import type { RecordingState } from '@/lib/recording'
 
 type Kind = 'tv' | 'movie' | 'sport' | 'program'
@@ -129,10 +131,6 @@ function formatDateTime(datetime: string): string {
   return start.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-function formatSize(bytes: number): string {
-  return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`
-}
-
 // Prefer the portrait poster; landscape art or a frame from the recording beat nothing.
 function posterImageId(artwork: Artwork, snapshotImageId: number | null = null): number | null {
   return artwork.thumbnailImageId ?? artwork.coverImageId ?? snapshotImageId ?? artwork.backgroundImageId
@@ -147,6 +145,7 @@ function RecordingCard({
   pill,
   lines,
   genres,
+  onOpen,
 }: {
   title: string
   subtitle: string | null
@@ -155,11 +154,27 @@ function RecordingCard({
   pill: ReactNode
   lines: string[]
   genres: string[]
+  // Makes the card clickable (and keyboard-activatable).
+  onOpen?: () => void
 }) {
   const [imageFailed, setImageFailed] = useState(false)
 
   return (
-    <Card className="gap-0 overflow-hidden py-0" title={description ?? undefined}>
+    <Card
+      className={`gap-0 overflow-hidden py-0 ${onOpen ? 'hover:ring-primary/50 focus-visible:ring-primary cursor-pointer transition-shadow outline-none hover:ring-2 focus-visible:ring-2' : ''}`}
+      title={description ?? undefined}
+      {...(onOpen && {
+        role: 'button',
+        tabIndex: 0,
+        onClick: onOpen,
+        onKeyDown: (e: KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onOpen()
+          }
+        },
+      })}
+    >
       <div className="bg-muted relative flex aspect-[2/3] items-center justify-center">
         {imageId != null && !imageFailed ? (
           <img
@@ -227,6 +242,8 @@ function recordedLines(group: RecordingGroup): string[] {
 export function RecordingsPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [sortOrder, setSortOrder] = useState<SortOrder>('date')
+  // The recorded movie open in the player dialog, by its /recordings/movies/... path.
+  const [playingMoviePath, setPlayingMoviePath] = useState<string | null>(null)
   const recorded = usePolledList<RecordingGroup>('/api/recordings')
   const scheduled = usePolledList<ScheduledItem>('/api/recordings/scheduled')
 
@@ -332,9 +349,14 @@ export function RecordingsPage() {
                 pill={group.inProgress && <RecordingNowPill />}
                 lines={recordedLines(group)}
                 genres={group.genres}
+                onOpen={group.kind === 'movie' ? () => setPlayingMoviePath(group.key) : undefined}
               />
             ))}
       </div>
+
+      <Dialog open={playingMoviePath !== null} onOpenChange={(open) => !open && setPlayingMoviePath(null)}>
+        {playingMoviePath !== null && <RecordingPlayerDialog key={playingMoviePath} moviePath={playingMoviePath} />}
+      </Dialog>
     </div>
   )
 }
