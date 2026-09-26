@@ -19,6 +19,8 @@ public partial class AiringsStore : IAiringsStore
         string? EpisodeTitle,
         IReadOnlyList<string> Descriptions,
         IReadOnlyList<(string Name, string Normalized)> Cast,
+        // Only ever populated for a movie - series and sports don't carry director credits.
+        IReadOnlyList<(string Name, string Normalized)> Directors,
         IReadOnlyList<string> Genres);
 
     // One series' or movie's airings (soonest first), with its series/movie object if the
@@ -176,9 +178,15 @@ public partial class AiringsStore : IAiringsStore
                 matchedFields.Add(SearchFields.Cast);
             }
 
+            var matchedDirectors = entry.Directors.Where(d => Matches(d.Normalized)).Select(d => d.Name).ToList();
+            if (matchedDirectors.Count > 0)
+            {
+                matchedFields.Add(SearchFields.Director);
+            }
+
             if (matchedFields.Count > 0)
             {
-                results.Add(new AiringSearchResult(entry.Airing, matchedFields, matchedCast, entry.Genres));
+                results.Add(new AiringSearchResult(entry.Airing, matchedFields, matchedCast, matchedDirectors, entry.Genres));
             }
         }
 
@@ -366,13 +374,17 @@ public partial class AiringsStore : IAiringsStore
             NormalizeAll(titles),
             string.IsNullOrWhiteSpace(episodeTitle) ? null : NormalizeWhitespace(episodeTitle),
             NormalizeAll(descriptions),
-            cast
-                .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(name => (name.Trim(), NormalizeWhitespace(name)))
-                .ToList(),
+            NormalizeNames(cast),
+            NormalizeNames(movie?.Directors ?? []),
             genres);
     }
+
+    private static List<(string Name, string Normalized)> NormalizeNames(IEnumerable<string> names) =>
+        names
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(name => (name.Trim(), NormalizeWhitespace(name)))
+            .ToList();
 
     private static List<string> NormalizeAll(IEnumerable<string?> texts) =>
         texts

@@ -10,7 +10,7 @@ import { TagFilterControls } from '@/components/TagFilterControls'
 import { useTagFilters } from '@/hooks/useTagFilters'
 import { recordingStateOf, type AiringSchedule, type RecordingState } from '@/lib/recording'
 
-type MatchedField = 'title' | 'episodeTitle' | 'description' | 'cast'
+type MatchedField = 'title' | 'episodeTitle' | 'description' | 'cast' | 'director'
 
 interface SearchAiring {
   airingDetails: {
@@ -35,6 +35,7 @@ interface SearchResult {
   airing: SearchAiring
   matchedFields: MatchedField[]
   matchedCast: string[]
+  matchedDirectors: string[]
   genres: string[]
 }
 
@@ -52,6 +53,7 @@ interface ShowGroup {
   kind: string
   matchedFields: Set<MatchedField>
   matchedCast: Set<string>
+  matchedDirectors: Set<string>
   genres: Set<string>
   results: SearchResult[]
 }
@@ -61,6 +63,7 @@ const FIELD_LABELS: Record<MatchedField, string> = {
   episodeTitle: 'Episode title',
   description: 'Description',
   cast: 'Cast',
+  director: 'Director',
 }
 
 function kindOf(a: SearchAiring): string {
@@ -84,6 +87,7 @@ function groupByShow(results: SearchResult[]): ShowGroup[] {
         kind: kindOf(a),
         matchedFields: new Set(),
         matchedCast: new Set(),
+        matchedDirectors: new Set(),
         genres: new Set(),
         results: [],
       }
@@ -91,6 +95,7 @@ function groupByShow(results: SearchResult[]): ShowGroup[] {
     }
     result.matchedFields.forEach((f) => group.matchedFields.add(f))
     result.matchedCast.forEach((c) => group.matchedCast.add(c))
+    result.matchedDirectors.forEach((d) => group.matchedDirectors.add(d))
     result.genres.forEach((g) => group.genres.add(g))
     group.results.push(result)
   }
@@ -205,7 +210,7 @@ export function SearchPage() {
           type="search"
           value={term}
           onChange={(e) => setTerm(e.target.value)}
-          placeholder="Search titles, episodes, actors and descriptions"
+          placeholder="Search titles, episodes, actors, directors and descriptions"
           aria-label="Search the guide"
           maxLength={100}
           autoFocus
@@ -279,6 +284,9 @@ export function SearchPage() {
                   ))}
                   {group.matchedCast.size > 0 && (
                     <span className="text-muted-foreground">({[...group.matchedCast].join(', ')})</span>
+                  )}
+                  {group.matchedDirectors.size > 0 && (
+                    <span className="text-muted-foreground">({[...group.matchedDirectors].join(', ')})</span>
                   )}
                 </div>
               </CardHeader>
