@@ -9,13 +9,14 @@ public record ChannelAirings(GuideChannel Channel, IReadOnlyList<Airing> Airings
 
 /// <summary>
 /// One airing that matched a search, with which of its fields matched (see
-/// <see cref="SearchFields"/>), for a cast match the matching cast members' names, and the
+/// <see cref="SearchFields"/>), for a cast or director match the matching names, and the
 /// genres of its series/movie/sport (for the Search page's own tag filters).
 /// </summary>
 public record AiringSearchResult(
     Airing Airing,
     IReadOnlyList<string> MatchedFields,
     IReadOnlyList<string> MatchedCast,
+    IReadOnlyList<string> MatchedDirectors,
     IReadOnlyList<string> Genres);
 
 /// <summary>
@@ -65,6 +66,7 @@ public static class SearchFields
     public const string EpisodeTitle = "episodeTitle";
     public const string Description = "description";
     public const string Cast = "cast";
+    public const string Director = "director";
 }
 
 /// <summary>
