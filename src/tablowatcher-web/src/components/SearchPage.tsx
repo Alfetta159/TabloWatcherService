@@ -5,8 +5,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { RecordButton, RecordingPill, ScheduleStatus } from '@/components/Recording'
 import { TagFilterControls } from '@/components/TagFilterControls'
 import { useTagFilters } from '@/hooks/useTagFilters'
+import { recordingStateOf, type AiringSchedule, type RecordingState } from '@/lib/recording'
 
 type MatchedField = 'title' | 'episodeTitle' | 'description' | 'cast'
 
@@ -26,6 +28,7 @@ interface SearchAiring {
   episode?: { title: string | null; description: string; number: number; seasonNumber: number } | null
   movieAiring?: { releaseYear: number } | null
   event?: { description: string } | null
+  schedule?: AiringSchedule | null
 }
 
 interface SearchResult {
@@ -134,6 +137,12 @@ function highlight(text: string, term: string): ReactNode {
   )
 }
 
+// The pill for a group's header: any of its airings in conflict, else any set to record.
+function groupRecordingState(group: ShowGroup): RecordingState | null {
+  const states = group.results.map((r) => recordingStateOf(r.airing.schedule ?? null))
+  return states.includes('conflict') ? 'conflict' : states.includes('scheduled') ? 'scheduled' : null
+}
+
 export function SearchPage() {
   const [term, setTerm] = useState('')
   const [response, setResponse] = useState<SearchResponse | null>(null)
@@ -162,6 +171,16 @@ export function SearchPage() {
     })
   }
 
+  function runSearch(q: string) {
+    return fetch(`/api/search?${new URLSearchParams({ q })}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`API returned ${res.status}`)
+        return res.json() as Promise<SearchResponse>
+      })
+      .then(setResponse)
+      .catch((err) => setError(err.message))
+  }
+
   function search(e: FormEvent) {
     e.preventDefault()
     const q = term.trim()
@@ -169,14 +188,14 @@ export function SearchPage() {
 
     setLoading(true)
     setError(null)
-    fetch(`/api/search?${new URLSearchParams({ q })}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`API returned ${res.status}`)
-        return res.json() as Promise<SearchResponse>
-      })
-      .then(setResponse)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
+    runSearch(q).finally(() => setLoading(false))
+  }
+
+  // After a recording is set or cancelled, re-run the same search (quietly, keeping which
+  // groups are collapsed) so every result's status is current - scheduling one airing of a
+  // movie can also skip or un-skip its other airings.
+  function refreshResults() {
+    if (response) runSearch(response.query)
   }
 
   return (
@@ -228,6 +247,7 @@ export function SearchPage() {
       {response &&
         groups.map((group) => {
           const collapsed = collapsedKeys.has(group.key)
+          const groupState = groupRecordingState(group)
           return (
             <Card key={group.key}>
               <CardHeader className="space-y-2">
@@ -245,7 +265,10 @@ export function SearchPage() {
                     )}
                     <CardTitle>{highlight(group.title, response.query)}</CardTitle>
                   </div>
-                  <Badge variant="outline">{group.kind}</Badge>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {groupState && <RecordingPill state={groupState} />}
+                    <Badge variant="outline">{group.kind}</Badge>
+                  </div>
                 </button>
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
                   <span className="text-muted-foreground">Matched:</span>
@@ -265,15 +288,19 @@ export function SearchPage() {
                     const label = episodeLabel(airing)
                     const description = airing.episode?.description || airing.event?.description
                     return (
-                      <div key={airing.path} className="space-y-1 py-2 first:pt-0 last:pb-0">
-                        <div className="flex items-baseline justify-between gap-4">
-                          <span className="font-medium">{formatAiringTime(airing)}</span>
-                          <span className="text-muted-foreground shrink-0">{formatChannel(airing)}</span>
+                      <div key={airing.path} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span className="font-medium">{formatAiringTime(airing)}</span>
+                            <span className="text-muted-foreground">{formatChannel(airing)}</span>
+                            <ScheduleStatus schedule={airing.schedule ?? null} />
+                          </div>
+                          {label && <p>{highlight(label, response.query)}</p>}
+                          {description && (
+                            <p className="text-muted-foreground line-clamp-2">{highlight(description, response.query)}</p>
+                          )}
                         </div>
-                        {label && <p>{highlight(label, response.query)}</p>}
-                        {description && (
-                          <p className="text-muted-foreground line-clamp-2">{highlight(description, response.query)}</p>
-                        )}
+                        <RecordButton path={airing.path} schedule={airing.schedule ?? null} onChanged={refreshResults} />
                       </div>
                     )
                   })}

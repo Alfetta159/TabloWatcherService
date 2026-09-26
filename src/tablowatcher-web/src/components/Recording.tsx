@@ -3,8 +3,8 @@ import { CircleDot, LoaderCircle, TriangleAlert } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
-  isConflict,
   isScheduled,
+  recordingStateOf,
   setScheduled,
   type AiringSchedule,
   type RecordingState,
@@ -41,22 +41,57 @@ function skipNote(schedule: AiringSchedule | null): string | null {
   return 'Skipped'
 }
 
-// One upcoming airing with its recording status and a Record / Cancel button.
-export function AiringRow({ airing, onChanged }: { airing: ScheduledAiring; onChanged: (updated: ScheduledAiring) => void }) {
+// Records, or cancels the recording of, one airing - with a spinner while the Tablo answers
+// and the error if it doesn't.
+export function RecordButton({
+  path,
+  schedule,
+  onChanged,
+}: {
+  path: string
+  schedule: AiringSchedule | null
+  onChanged: (updated: ScheduledAiring) => void
+}) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const scheduled = isScheduled(airing.schedule)
-  const note = skipNote(airing.schedule)
-  const { major, minor, callSign } = airing.channel
+  const scheduled = isScheduled(schedule)
 
   function toggle() {
     setBusy(true)
     setError(null)
-    setScheduled(airing.path, !scheduled)
+    setScheduled(path, !scheduled)
       .then(onChanged)
       .catch((err) => setError(err.message))
       .finally(() => setBusy(false))
   }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button variant={scheduled ? 'outline' : 'default'} size="sm" onClick={toggle} disabled={busy}>
+        {busy ? <LoaderCircle className="size-4 animate-spin" /> : !scheduled && <CircleDot className="size-4" />}
+        {scheduled ? 'Cancel recording' : 'Record'}
+      </Button>
+      {error && <p className="text-destructive text-xs">{error}</p>}
+    </div>
+  )
+}
+
+// The pill for one airing's schedule (nothing if it isn't set to record), plus why a
+// skipped airing won't be.
+export function ScheduleStatus({ schedule }: { schedule: AiringSchedule | null }) {
+  const state = recordingStateOf(schedule)
+  const note = skipNote(schedule)
+  return (
+    <>
+      {state && <RecordingPill state={state} />}
+      {note && <span className="text-muted-foreground text-xs">{note}</span>}
+    </>
+  )
+}
+
+// One upcoming airing with its recording status and a Record / Cancel button.
+export function AiringRow({ airing, onChanged }: { airing: ScheduledAiring; onChanged: (updated: ScheduledAiring) => void }) {
+  const { major, minor, callSign } = airing.channel
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -68,19 +103,10 @@ export function AiringRow({ airing, onChanged }: { airing: ScheduledAiring; onCh
           </span>
           {airing.live && <Badge variant="outline">Live</Badge>}
           {airing.isNew && <Badge variant="outline">New</Badge>}
-          {isConflict(airing.schedule) ? (
-            <RecordingPill state="conflict" />
-          ) : (
-            scheduled && <RecordingPill state="scheduled" />
-          )}
-          {note && <span>{note}</span>}
+          <ScheduleStatus schedule={airing.schedule} />
         </div>
-        {error && <p className="text-destructive text-xs">{error}</p>}
       </div>
-      <Button variant={scheduled ? 'outline' : 'default'} size="sm" onClick={toggle} disabled={busy}>
-        {busy ? <LoaderCircle className="size-4 animate-spin" /> : !scheduled && <CircleDot className="size-4" />}
-        {scheduled ? 'Cancel recording' : 'Record'}
-      </Button>
+      <RecordButton path={airing.path} schedule={airing.schedule} onChanged={onChanged} />
     </div>
   )
 }

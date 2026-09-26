@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TabloWatcherService.Api.Models;
 
 // A Tablo airing is one of several shapes depending on content type (plain program,
@@ -35,9 +37,13 @@ public class AiringSchedule
     public string? SkipReason { get; set; }
     public string? SkipDetail { get; set; }
 
+    // Helpers for server code only - airings are serialized whole (e.g. in search results),
+    // and these shouldn't appear there as if the device had sent them.
+    [JsonIgnore]
     public bool IsConflict => State is "conflict" or "conflicted";
 
     // Going to be (or being) recorded - scheduled and not in conflict.
+    [JsonIgnore]
     public bool IsScheduled => State is "scheduled" or "recording";
 
     /// <summary>
