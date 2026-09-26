@@ -7,13 +7,8 @@ namespace TabloWatcherService.Api.Services.Tablo;
 /// the first Tablo server the association server knows about: GET /guide/airings for the
 /// list of airing paths, then POST /batch in sequential chunks to hydrate them (and then the
 /// series, movies and sports they belong to), mirroring the
-/// tablo-legacy-m3u Python project's approach to building an EPG from the same API.
-///
-/// Unlike that Python client, batches here run one at a time rather than a few in parallel:
-/// against a real device, concurrent /batch calls caused a meaningful fraction of requests
-/// to fail outright ("the response ended prematurely") - its embedded HTTP server appears
-/// not to tolerate more than one request in flight. Even sequential, a small fraction of
-/// chunks still fail transiently, hence the retry in <see cref="ChunkedBatchAsync"/>.
+/// tablo-legacy-m3u Python project's approach to building an EPG from the same API. Unlike
+/// that Python client, batches run one at a time - see <see cref="TabloBatch"/>.
 /// </summary>
 public class AiringsRefreshService(
     ICurrentTabloDeviceResolver deviceResolver,
@@ -21,11 +16,6 @@ public class AiringsRefreshService(
     IConfiguration configuration,
     ILogger<AiringsRefreshService> logger) : BackgroundService
 {
-    private const int BatchSize = 50;
-    private const int MaxConcurrentBatches = 1;
-    private const int RetryCount = 2;
-    private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(500);
-
     // After a failed refresh (e.g. the association server rate-limiting us at startup),
     // try again soon rather than leaving the guide empty for a whole refresh interval.
     private static readonly TimeSpan FailedRefreshRetryInterval = TimeSpan.FromMinutes(1);
@@ -75,18 +65,18 @@ public class AiringsRefreshService(
         var paths = pathsResponse.Content;
         logger.LogInformation("Found {Count} airing paths", paths.Length);
 
-        var (airings, failedChunks) = await ChunkedBatchAsync<Airing>(client, paths, cancellationToken);
+        var (airings, failedChunks) = await TabloBatch.FetchAsync<Airing>(client, paths, logger, cancellationToken);
 
         // Cast lists, artwork and series/movie/sport descriptions aren't on the airings
         // themselves, only on the series/movie/sport each one points back to - hydrate those too.
         // A failed chunk here just means fewer of those fields are searchable, not a failed
         // refresh.
-        var (series, failedSeriesChunks) = await ChunkedBatchAsync<GuideSeries>(
-            client, DistinctPaths(airings, a => a.SeriesPath), cancellationToken);
-        var (movies, failedMovieChunks) = await ChunkedBatchAsync<GuideMovie>(
-            client, DistinctPaths(airings, a => a.MoviePath), cancellationToken);
-        var (sports, failedSportChunks) = await ChunkedBatchAsync<GuideSport>(
-            client, DistinctPaths(airings, a => a.SportPath), cancellationToken);
+        var (series, failedSeriesChunks) = await TabloBatch.FetchAsync<GuideSeries>(
+            client, DistinctPaths(airings, a => a.SeriesPath), logger, cancellationToken);
+        var (movies, failedMovieChunks) = await TabloBatch.FetchAsync<GuideMovie>(
+            client, DistinctPaths(airings, a => a.MoviePath), logger, cancellationToken);
+        var (sports, failedSportChunks) = await TabloBatch.FetchAsync<GuideSport>(
+            client, DistinctPaths(airings, a => a.SportPath), logger, cancellationToken);
 
         store.Replace(airings, new GuideDetails(
             ToDictionaryByPath(series, s => s.Path),
@@ -109,72 +99,4 @@ public class AiringsRefreshService(
 
     private static Dictionary<string, T> ToDictionaryByPath<T>(IEnumerable<T> items, Func<T, string> path) =>
         items.DistinctBy(path).ToDictionary(path);
-
-    private async Task<(List<T> Items, int FailedChunks)> ChunkedBatchAsync<T>(
-        ITabloDeviceClient client, IReadOnlyList<string> paths, CancellationToken cancellationToken)
-        where T : class
-    {
-        using var throttle = new SemaphoreSlim(MaxConcurrentBatches);
-        var failedChunks = 0;
-
-        var tasks = paths.Chunk(BatchSize).Select(async chunk =>
-        {
-            await throttle.WaitAsync(cancellationToken);
-            try
-            {
-                for (var attempt = 0; attempt <= RetryCount; attempt++)
-                {
-                    if (attempt > 0)
-                    {
-                        await Task.Delay(RetryDelay, cancellationToken);
-                    }
-
-                    ApiResponse<IDictionary<string, T>>? response = null;
-                    Exception? error = null;
-                    try
-                    {
-                        response = await client.PostBatchAsync<T>(chunk);
-                        error = response.Error;
-                    }
-                    catch (HttpRequestException ex)
-                    {
-                        // The device's embedded server occasionally drops a request outright
-                        // (see class remarks); worth a retry rather than losing the chunk.
-                        error = ex;
-                    }
-
-                    if (response is { IsSuccessStatusCode: true, Content: not null })
-                    {
-                        // A path can go stale between the GET and this batch call (e.g. an
-                        // airing that's since rolled off the guide); the device returns null
-                        // for it rather than omitting the key.
-                        return response.Content.Values.Where(a => a is not null).ToList()!;
-                    }
-
-                    // Includes a response that arrived but didn't deserialize into T (e.g. a
-                    // null where the model expects a value) - which fails the whole chunk, so
-                    // it's worth saying why rather than just counting it.
-                    if (attempt == RetryCount)
-                    {
-                        logger.LogWarning(
-                            error,
-                            "Batch of {Count} {Type} path(s) starting {FirstPath} failed after retries",
-                            chunk.Length,
-                            typeof(T).Name,
-                            chunk[0]);
-                    }
-                }
-
-                Interlocked.Increment(ref failedChunks);
-                return [];
-            }
-            finally
-            {
-                throttle.Release();
-            }
-        });
-
-        var results = await Task.WhenAll(tasks);
-        return (results.SelectMany(r => r).ToList(), failedChunks);
-    }
 }

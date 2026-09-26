@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { RecordingPill } from '@/components/Recording'
 import { TagFilterControls } from '@/components/TagFilterControls'
 import { useTagFilters } from '@/hooks/useTagFilters'
+import { compareTitles } from '@/lib/format'
 import type { RecordingState } from '@/lib/recording'
 
 // A channel as the TV shows/movies/sports endpoints return it (UpcomingResponses on the server).
@@ -196,13 +197,8 @@ export type SortOrder = 'title' | 'airDate'
 
 const SORT_LABELS: Record<SortOrder, string> = { title: 'Title', airDate: 'Air date' }
 
-// Sorts "The Office" with the Os, matching the server's own title order (AiringsStore).
-function sortableTitle(title: string): string {
-  return title.replace(/^(the|a|an)\s+(?=\S)/i, '')
-}
-
-function compareTitles(a: PosterCardData, b: PosterCardData): number {
-  return sortableTitle(a.title).localeCompare(sortableTitle(b.title), undefined, { sensitivity: 'base' })
+function compareCardTitles(a: PosterCardData, b: PosterCardData): number {
+  return compareTitles(a.title, b.title)
 }
 
 const NO_FACETS: Facet[] = []
@@ -323,8 +319,8 @@ export function PosterGridPage<T>({
         // the Channel filter), then by title for airings at the same time.
         .sort((a, b) =>
           sortOrder === 'airDate'
-            ? Date.parse(a.channels[0].nextAiring) - Date.parse(b.channels[0].nextAiring) || compareTitles(a.card, b.card)
-            : compareTitles(a.card, b.card),
+            ? Date.parse(a.channels[0].nextAiring) - Date.parse(b.channels[0].nextAiring) || compareCardTitles(a.card, b.card)
+            : compareCardTitles(a.card, b.card),
         ),
     [cards, channelFilter, tagFilters.includeTags, facets, facetSelections, sortOrder],
   )
