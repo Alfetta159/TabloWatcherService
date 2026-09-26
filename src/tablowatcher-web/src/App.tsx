@@ -322,7 +322,10 @@ function App() {
               : 'mx-auto w-full max-w-2xl flex-1 space-y-6 overflow-y-auto p-6'
           }
         >
-        {selectedNav === 'Live TV' ? (
+        {/* Kept mounted (just hidden) rather than unmounted when navigating away, so the
+            live stream - and any native Picture-in-Picture window playing it - keeps
+            running instead of being torn down with the rest of this page. */}
+        <div className={selectedNav === 'Live TV' ? 'contents' : 'hidden'}>
           <ResizableSplit
             className="h-full"
             defaultTopRatio={1 / 2}
@@ -409,7 +412,8 @@ function App() {
               </Card>
             }
           />
-        ) : selectedNav === 'Search' ? (
+        </div>
+        {selectedNav === 'Live TV' ? null : selectedNav === 'Search' ? (
           <SearchPage />
         ) : selectedNav === 'TV Shows' ? (
           <TvShowsPage />
