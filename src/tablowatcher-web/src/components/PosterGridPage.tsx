@@ -41,7 +41,31 @@ export interface PosterCardData {
   channels: UpcomingChannel[]
   // Highlighted on the poster, e.g. "Live".
   flag?: string | null
+  // This card's value for each of the page's facets (see Facet), keyed by Facet.key; null
+  // or missing means it has none (e.g. an unrated movie).
+  facets?: Record<string, string | null>
 }
+
+// An extra dropdown filter over one property of the cards, like a movie's rating.
+// Its options are whatever values the cards actually have, plus "Not rated" (or noneLabel)
+// when some card has none.
+export interface Facet {
+  key: string
+  label: string
+  // The dropdown's "no filter" option, e.g. "All ratings".
+  placeholder: string
+  formatValue?: (value: string) => string
+  // Orders the options; defaults to alphabetical.
+  compare?: (a: string, b: string) => number
+  noneLabel?: string
+}
+
+// Stands in for "no value" (e.g. unrated) as a facet option; no real rating looks like it.
+const NO_VALUE = '__none__'
+
+// Shared by the Channel and facet dropdowns.
+const SELECT_CLASS_NAME =
+  'border-input bg-background focus-visible:ring-ring/50 h-9 rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px]'
 
 interface UpcomingResponse<T> {
   updatedAt: string | null
@@ -136,6 +160,13 @@ interface PosterGridPageProps<T> {
   placeholderIcon: ComponentType<{ className?: string }>
   // Off where every item is a single airing (sports events), so the count is always 1.
   showAiringCount?: boolean
+  facets?: Facet[]
+}
+
+const NO_FACETS: Facet[] = []
+
+function facetValue(card: PosterCardData, facet: Facet): string {
+  return card.facets?.[facet.key] ?? NO_VALUE
 }
 
 // A poster card per upcoming title (TV show, movie, sports event), with a channel filter.
@@ -145,10 +176,13 @@ export function PosterGridPage<T>({
   toCard,
   placeholderIcon,
   showAiringCount = true,
+  facets = NO_FACETS,
 }: PosterGridPageProps<T>) {
   const [data, setData] = useState<UpcomingResponse<T> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [channelFilter, setChannelFilter] = useState(ALL_CHANNELS)
+  // Facet key -> the value chosen in its dropdown; absent means no filtering.
+  const [facetSelections, setFacetSelections] = useState<Record<string, string>>({})
   // `endpoint` is already e.g. "/api/tv-shows", so it doubles as the "kind" the tags
   // endpoint expects.
   const tagFilters = useTagFilters(endpoint.replace(/^\/api\//, ''))
@@ -194,6 +228,21 @@ export function PosterGridPage<T>({
     return [...byId.values()].sort((a, b) => a.major - b.major || a.minor - b.minor)
   }, [cards])
 
+  // Each facet's options: the values the cards actually have, sorted, with "no value" last.
+  const facetOptions = useMemo(
+    () =>
+      facets.map((facet) => {
+        const values = new Set(cards.map((card) => facetValue(card, facet)))
+        const hasNone = values.delete(NO_VALUE)
+        const options = [...values]
+          .sort(facet.compare ?? ((a, b) => a.localeCompare(b)))
+          .map((value) => ({ value, label: facet.formatValue?.(value) ?? value }))
+        if (hasNone) options.push({ value: NO_VALUE, label: facet.noneLabel ?? 'Not rated' })
+        return options
+      }),
+    [cards, facets],
+  )
+
   // Each card paired with just the channels that pass the filter (so it shows the next
   // airing on the chosen channel), dropping cards with none.
   const visible = useMemo(
@@ -207,8 +256,14 @@ export function PosterGridPage<T>({
               : card.channels.filter((c) => String(c.objectId) === channelFilter),
         }))
         .filter(({ channels }) => channels.length > 0)
-        .filter(({ card }) => tagFilters.includeTags.size === 0 || card.genres.some((g) => tagFilters.includeTags.has(g))),
-    [cards, channelFilter, tagFilters.includeTags],
+        .filter(({ card }) => tagFilters.includeTags.size === 0 || card.genres.some((g) => tagFilters.includeTags.has(g)))
+        .filter(({ card }) =>
+          facets.every((facet) => {
+            const selected = facetSelections[facet.key]
+            return !selected || selected === facetValue(card, facet)
+          }),
+        ),
+    [cards, channelFilter, tagFilters.includeTags, facets, facetSelections],
   )
 
   const filterId = `${endpoint}-channel`
@@ -223,7 +278,7 @@ export function PosterGridPage<T>({
               id={filterId}
               value={channelFilter}
               onChange={(e) => setChannelFilter(e.target.value)}
-              className="border-input bg-background focus-visible:ring-ring/50 h-9 min-w-56 rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+              className={`${SELECT_CLASS_NAME} min-w-56`}
             >
               <option value={ALL_CHANNELS}>All channels</option>
               {channelOptions.map((c) => (
@@ -234,6 +289,25 @@ export function PosterGridPage<T>({
               ))}
             </select>
           </div>
+
+          {facets.map((facet, i) => (
+            <div key={facet.key} className="space-y-1.5">
+              <Label htmlFor={`${endpoint}-${facet.key}`}>{facet.label}</Label>
+              <select
+                id={`${endpoint}-${facet.key}`}
+                value={facetSelections[facet.key] ?? ''}
+                onChange={(e) => setFacetSelections((prev) => ({ ...prev, [facet.key]: e.target.value }))}
+                className={`${SELECT_CLASS_NAME} min-w-36`}
+              >
+                <option value="">{facet.placeholder}</option>
+                {facetOptions[i].map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
 
           <TagFilterControls {...tagFilters} />
         </div>
