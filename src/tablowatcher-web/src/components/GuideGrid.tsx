@@ -28,6 +28,7 @@ interface MovieAiringInfo {
 }
 
 interface GridAiring {
+  path: string
   airingDetails: {
     datetime: string
     duration: number
@@ -63,7 +64,10 @@ export interface WatchedChannel {
 }
 
 function airingKey(a: GridAiring): string {
-  return a.airingDetails.datetime + a.airingDetails.showTitle
+  // The Tablo guide occasionally lists two distinct airings on the same channel with an
+  // identical start time and title (e.g. back-to-back re-airs) - `path` is unique per
+  // airing object, so prefer it over datetime+title to avoid colliding React keys.
+  return a.path || a.airingDetails.datetime + a.airingDetails.showTitle
 }
 
 function nowPlayingAiring(airings: GridAiring[]): GridAiring | null {
