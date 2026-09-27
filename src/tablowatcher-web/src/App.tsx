@@ -4,7 +4,6 @@ import {
   Disc3,
   Film,
   MonitorPlay,
-  Radio,
   Search,
   Settings,
   Trophy,
@@ -40,12 +39,12 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Live TV', icon: Tv },
+  { label: 'Recordings', icon: Disc3 },
   { label: 'Search', icon: Search },
   { label: 'TV Shows', icon: MonitorPlay },
   { label: 'Movies', icon: Film },
   { label: 'Sports', icon: Trophy },
   { label: 'Scheduled', icon: CalendarClock },
-  { label: 'Recordings', icon: Disc3 },
   { label: 'Settings', icon: Settings },
 ]
 
@@ -286,7 +285,7 @@ function App() {
     >
       <header className="flex items-center gap-4 border-b px-6 py-3">
         <div className="flex items-center gap-2 font-semibold">
-          <Radio className="size-5 text-primary" />
+          <img src="/favicon-32.png" alt="" className="size-5" />
           Tabloid
         </div>
         {servers.length > 0 && (
