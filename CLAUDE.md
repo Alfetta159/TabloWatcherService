@@ -54,9 +54,11 @@ dotnet publish src/TabloWatcherService.Api -c Release -o ./publish
 ```
 
 The `BuildSpa` MSBuild target in `TabloWatcherService.Api.csproj` runs `npm ci` + `npm run
-build` for the SPA and injects the built files into the publish output (hooked on
-`AfterTargets="ComputeFilesToPublish"`, not before, because the wwwroot glob that normally
-picks up static content is evaluated before an earlier hook would run). A plain `dotnet
+build` for the SPA before the build starts (only when `_IsPublishing` is set, i.e. under
+`dotnet publish`), then re-reads the `wwwroot` Content items so the static web assets list
+sees the freshly built files. It has to run that early: Vite empties `wwwroot` and writes new
+hashed file names, so building the SPA any later leaves publish trying to copy files that no
+longer exist (MSB3030 on the first publish after every frontend change). A plain `dotnet
 build`/`dotnet run` does **not** trigger this — during backend-only work the SPA is stale
 until you publish or build it yourself. Result is a single self-contained deployable:
 `dotnet TabloWatcherService.Api.dll` serves both API and SPA on one port.
