@@ -46,3 +46,16 @@ export async function setScheduled(path: string, scheduled: boolean): Promise<Sc
 export function recordingStateOf(schedule: AiringSchedule | null): RecordingState | null {
   return isConflict(schedule) ? 'conflict' : isScheduled(schedule) ? 'scheduled' : null
 }
+
+// Stops (keeping what's recorded so far) or deletes one recording.
+export async function postRecordingAction(action: 'stop' | 'delete', path: string): Promise<void> {
+  const res = await fetch(`/api/recordings/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  })
+  if (!res.ok) {
+    const problem = (await res.json().catch(() => null)) as { detail?: string } | null
+    throw new Error(problem?.detail ?? (res.status === 502 ? "The Tablo didn't respond - try again" : `API returned ${res.status}`))
+  }
+}

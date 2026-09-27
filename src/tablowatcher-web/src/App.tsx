@@ -4,7 +4,6 @@ import {
   Disc3,
   Film,
   MonitorPlay,
-  Radio,
   Search,
   Settings,
   Trophy,
@@ -25,6 +24,7 @@ import { ResizableSplit } from '@/components/ResizableSplit'
 import { RecordingsPage } from '@/components/RecordingsPage'
 import { SchedulePage } from '@/components/SchedulePage'
 import { SearchPage } from '@/components/SearchPage'
+import { SettingsPage } from '@/components/SettingsPage'
 import { MoviesPage, SportsPage, TvShowsPage } from '@/components/UpcomingPages'
 
 interface WeatherForecast {
@@ -41,17 +41,17 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Live TV', icon: Tv },
+  { label: 'Recordings', icon: Disc3 },
   { label: 'Search', icon: Search },
   { label: 'TV Shows', icon: MonitorPlay },
   { label: 'Movies', icon: Film },
   { label: 'Sports', icon: Trophy },
   { label: 'Scheduled', icon: CalendarClock },
-  { label: 'Recordings', icon: Disc3 },
   { label: 'Settings', icon: Settings },
 ]
 
 // Pages that use the whole width of the main area rather than a narrow centered column.
-const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports', 'Recordings', 'Scheduled'])
+const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports', 'Recordings', 'Scheduled', 'Settings'])
 
 interface ChannelDetails {
   callSign: string
@@ -287,7 +287,7 @@ function App() {
     >
       <header className="flex items-center gap-4 border-b px-6 py-3">
         <div className="flex items-center gap-2 font-semibold">
-          <Radio className="size-5 text-primary" />
+          <img src="/favicon-32.png" alt="" className="size-5" />
           Tabloid
         </div>
         {servers.length > 0 && (
@@ -426,6 +426,8 @@ function App() {
           <RecordingsPage />
         ) : selectedNav === 'Scheduled' ? (
           <SchedulePage />
+        ) : selectedNav === 'Settings' ? (
+          <SettingsPage />
         ) : (
           <>
         <Alert>
