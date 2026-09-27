@@ -23,20 +23,22 @@
 
   <!-- Builds the React SPA and drops it into wwwroot so `dotnet publish` produces a
        single self-contained deployable (API + SPA). Skipped for local `dotnet build`/`dotnet run`
-       during frontend development, where `npm run dev` (Vite) is faster to iterate against.
-       Runs AfterTargets="ComputeFilesToPublish" (rather than BeforeTargets="Publish") and adds the
-       built files to @(ResolvedFileToPublish) directly, because the wwwroot content glob that
-       normally picks up static files is evaluated before this target would otherwise run, so a
-       freshly-built wwwroot would be silently skipped. -->
-  <Target Name="BuildSpa" AfterTargets="ComputeFilesToPublish">
+       during frontend development, where `npm run dev` (Vite) is faster to iterate against
+       (_IsPublishing is set by the `dotnet publish` command).
+       Runs before the build, not after ComputeFilesToPublish: the static web assets list is
+       taken from wwwroot during the build, and Vite empties wwwroot and writes new hashed
+       file names, so building the SPA any later leaves publish trying to copy files that are
+       gone (MSB3030) on the first publish after every frontend change. The wwwroot Content
+       glob is evaluated before any target runs, so it's re-read here to pick up the new files. -->
+  <Target Name="BuildSpa" BeforeTargets="BeforeBuild" Condition="'$(_IsPublishing)' == 'true'">
     <Exec Command="npm ci" WorkingDirectory="$(SpaRoot)" Condition="!Exists('$(SpaRoot)node_modules')" />
     <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
     <ItemGroup>
-      <SpaFiles Include="wwwroot\**" />
-      <ResolvedFileToPublish Include="@(SpaFiles)">
-        <RelativePath>%(SpaFiles.Identity)</RelativePath>
-        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      </ResolvedFileToPublish>
+      <!-- By item, not by glob: a glob here only matches what's on disk now, missing the
+           files Vite just deleted. -->
+      <_OldSpaFile Include="@(Content)" Condition="$([System.String]::Copy('%(Content.Identity)').StartsWith('wwwroot'))" />
+      <Content Remove="@(_OldSpaFile)" />
+      <Content Include="wwwroot\**" ExcludeFromSingleFile="true" CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
   </Target>
 
