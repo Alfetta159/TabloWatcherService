@@ -46,6 +46,10 @@ public class AiringSchedule
     [JsonIgnore]
     public bool IsScheduled => State is "scheduled" or "recording";
 
+    // A recording rule covers it, but the device won't record it - see SkipReason.
+    [JsonIgnore]
+    public bool IsSkipped => State is "skipped";
+
     /// <summary>
     /// What a card's recording pill should say about a set of airings: "conflict" if any
     /// can't be recorded for lack of a tuner, else "scheduled" if any will be recorded, else
