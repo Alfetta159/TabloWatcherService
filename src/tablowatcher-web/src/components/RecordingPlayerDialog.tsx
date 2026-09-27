@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { LivePlayer } from '@/components/LivePlayer'
 import type { ChannelInfo } from '@/components/PosterGridPage'
+import { postRecordingAction } from '@/lib/recording'
 import { formatClock, formatDuration, formatRating, formatSize, formatStars } from '@/lib/format'
 
 // GET /api/recordings/movies/{id}.
@@ -67,19 +68,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       {children}
     </section>
   )
-}
-
-// Stops (keeping what's recorded so far) or deletes one recording.
-async function postRecordingAction(action: 'stop' | 'delete', path: string): Promise<void> {
-  const res = await fetch(`/api/recordings/${action}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path }),
-  })
-  if (!res.ok) {
-    const problem = (await res.json().catch(() => null)) as { detail?: string } | null
-    throw new Error(problem?.detail ?? (res.status === 502 ? "The Tablo didn't respond - try again" : `API returned ${res.status}`))
-  }
 }
 
 // A recorded movie in a large dialog, split 1:3 - its details and recordings on the left,

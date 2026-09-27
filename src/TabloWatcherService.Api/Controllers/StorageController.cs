@@ -55,6 +55,27 @@ public class StorageController(IRecordingsStore recordings, ICurrentTabloDeviceR
                 label = g.Key.Label,
                 size = g.Sum(group => group.Recordings.Sum(r => r.VideoDetails?.Size ?? 0)),
                 recordingCount = g.Sum(group => group.Recordings.Count),
+                // Each recording, so a movie's or sport's can be picked out to delete. Not
+                // for TV - a series can run to hundreds of episodes.
+                recordings = g.Key.Kind is RecordingKinds.Movie or RecordingKinds.Sport
+                    ? g.SelectMany(group => group.Recordings.Select(r => new
+                        {
+                            path = r.Path,
+                            // The game ("Yankees at Red Sox") or the movie.
+                            title = group.Title,
+                            // The competition ("MLB Baseball"), or the movie's release year.
+                            subtitle = group.Sport?.Title
+                                ?? (r.MovieAiring?.ReleaseYear is > 0 ? r.MovieAiring.ReleaseYear.ToString() : null),
+                            recordedAt = r.AiringDetails.Datetime,
+                            channel = UpcomingResponses.Channel(r.AiringDetails.Channel),
+                            state = r.VideoDetails?.State,
+                            duration = r.VideoDetails?.Duration ?? 0,
+                            size = r.VideoDetails?.Size ?? 0,
+                            watched = r.UserInfo?.Watched ?? false,
+                        }))
+                        .OrderByDescending(r => r.recordedAt)
+                        .ToList()
+                    : null,
             })
             .Where(item => item.size > 0)
             .OrderByDescending(item => item.size),

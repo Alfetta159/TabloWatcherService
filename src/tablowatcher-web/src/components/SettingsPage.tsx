@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { HardDrive as HardDriveIcon } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { DeleteRecordingsDialog, type StoredRecording } from '@/components/DeleteRecordingsDialog'
 import { formatSize } from '@/lib/format'
 
 // GET /server/harddrives on the device, via /api/storage/hard-drives. Sizes are bytes.
@@ -27,6 +29,8 @@ interface UsageItem {
   label: string
   size: number
   recordingCount: number
+  // Each recording - movies and sports only.
+  recordings: StoredRecording[] | null
 }
 
 interface UsageResponse {
@@ -53,6 +57,8 @@ const LOADING_POLL_INTERVAL_MS = 5_000
 function usePolled<T>(endpoint: string, isLoaded: (data: T) => boolean) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Bumped to re-read right away rather than at the next poll.
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -86,9 +92,10 @@ function usePolled<T>(endpoint: string, isLoaded: (data: T) => boolean) {
     }
     // isLoaded is expected to be a stable, module-level function.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endpoint])
+  }, [endpoint, reloadToken])
 
-  return { data, error }
+  const reload = useCallback(() => setReloadToken((t) => t + 1), [])
+  return { data, error, reload }
 }
 
 const drivesLoaded = () => true
@@ -149,7 +156,7 @@ function StorageTab() {
           ) : usage.data && usage.data.items.length === 0 ? (
             <p className="text-muted-foreground text-sm">No recordings yet.</p>
           ) : usage.data ? (
-            <RecordingUsage items={usage.data.items} />
+            <RecordingUsage items={usage.data.items} onChanged={usage.reload} />
           ) : (
             !usage.error && <p className="text-muted-foreground text-sm">Loading recordings…</p>
           )}
@@ -224,6 +231,8 @@ interface Slice {
   label: string
   size: number
   recordingCount: number
+  // Set for a movie or sport - which can be opened to delete its recordings.
+  recordings: StoredRecording[] | null
   // How many titles a leftovers slice stands for.
   folded?: number
 }
@@ -231,8 +240,10 @@ interface Slice {
 // Slices thinner than this are folded into one "N more" slice per category.
 const MIN_SLICE_ANGLE = (3 * Math.PI) / 180
 
-function RecordingUsage({ items }: { items: UsageItem[] }) {
+function RecordingUsage({ items, onChanged }: { items: UsageItem[]; onChanged: () => void }) {
   const [hovered, setHovered] = useState<string | null>(null)
+  // The movie or sport whose recordings are open to delete.
+  const [opened, setOpened] = useState<Slice | null>(null)
   const [filter, setFilter] = useState<Category | null>(null)
   const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null)
 
@@ -249,7 +260,14 @@ function RecordingUsage({ items }: { items: UsageItem[] }) {
         existing.size += item.size
         existing.recordingCount += item.recordingCount
       } else {
-        merged.set(key, { key, category, label: item.label, size: item.size, recordingCount: item.recordingCount })
+        merged.set(key, {
+          key,
+          category,
+          label: item.label,
+          size: item.size,
+          recordingCount: item.recordingCount,
+          recordings: item.recordings,
+        })
       }
     }
     const listed = [...merged.values()].sort((a, b) => b.size - a.size)
@@ -271,6 +289,7 @@ function RecordingUsage({ items }: { items: UsageItem[] }) {
           label: `${rest.length} more`,
           size: rest.reduce((sum, s) => sum + s.size, 0),
           recordingCount: rest.reduce((sum, s) => sum + s.recordingCount, 0),
+          recordings: null,
           folded: rest.length,
         })
       }
@@ -341,7 +360,8 @@ function RecordingUsage({ items }: { items: UsageItem[] }) {
               fill={colorOf(s.category)}
               opacity={isDimmed(s.key, s.category) ? 0.2 : s.folded ? 0.45 : 0.75}
               onMouseMove={(e) => hover(s.key, e)}
-              className="transition-opacity"
+              onClick={() => s.recordings && setOpened(s)}
+              className={`transition-opacity ${s.recordings ? 'cursor-pointer' : ''}`}
             />
           ))}
           <text x="160" y="154" textAnchor="middle" className="fill-foreground text-2xl font-semibold">
@@ -404,7 +424,18 @@ function RecordingUsage({ items }: { items: UsageItem[] }) {
                   key={s.key}
                   onMouseEnter={() => setHovered(s.key)}
                   onMouseLeave={() => setHovered(null)}
-                  className={`border-t ${hovered === s.key ? 'bg-muted' : ''}`}
+                  // Movies and sports open to manage their recordings; TV shows don't (yet).
+                  {...(s.recordings && {
+                    onClick: () => setOpened(s),
+                    onKeyDown: (e) => {
+                      if (e.key !== 'Enter' && e.key !== ' ') return
+                      e.preventDefault()
+                      setOpened(s)
+                    },
+                    tabIndex: 0,
+                    'aria-haspopup': 'dialog',
+                  })}
+                  className={`border-t ${hovered === s.key ? 'bg-muted' : ''} ${s.recordings ? 'focus-visible:bg-muted cursor-pointer outline-none' : ''}`}
                 >
                   <td className="w-full max-w-0 px-3 py-1.5">
                     <span className="flex items-center gap-2">
@@ -421,6 +452,18 @@ function RecordingUsage({ items }: { items: UsageItem[] }) {
           </table>
         </div>
       </div>
+
+      <Dialog open={opened !== null} onOpenChange={(open) => !open && setOpened(null)}>
+        {opened?.recordings && (
+          <DeleteRecordingsDialog
+            key={opened.key}
+            title={opened.label}
+            recordings={opened.recordings}
+            onChanged={onChanged}
+            onEmpty={() => setOpened(null)}
+          />
+        )}
+      </Dialog>
     </div>
   )
 }
