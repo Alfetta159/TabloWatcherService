@@ -23,6 +23,7 @@ import { LivePlayer } from '@/components/LivePlayer'
 import { ResizableSplit } from '@/components/ResizableSplit'
 import { RecordingsPage } from '@/components/RecordingsPage'
 import { SearchPage } from '@/components/SearchPage'
+import { SettingsPage } from '@/components/SettingsPage'
 import { MoviesPage, SportsPage, TvShowsPage } from '@/components/UpcomingPages'
 
 interface WeatherForecast {
@@ -49,7 +50,7 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 // Pages that use the whole width of the main area rather than a narrow centered column.
-const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports', 'Recordings'])
+const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports', 'Recordings', 'Settings'])
 
 interface ChannelDetails {
   callSign: string
@@ -422,6 +423,8 @@ function App() {
           <SportsPage />
         ) : selectedNav === 'Recordings' ? (
           <RecordingsPage />
+        ) : selectedNav === 'Settings' ? (
+          <SettingsPage />
         ) : (
           <>
         <Alert>
