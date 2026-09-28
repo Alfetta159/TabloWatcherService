@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ChannelsTab } from '@/components/ChannelsTab'
 import { DeleteRecordingsDialog, type StoredRecording } from '@/components/DeleteRecordingsDialog'
 import { formatSize } from '@/lib/format'
 
@@ -105,8 +106,12 @@ export function SettingsPage() {
   return (
     <Tabs defaultValue="storage" className="h-full">
       <TabsList>
+        <TabsTrigger value="channels">Channels</TabsTrigger>
         <TabsTrigger value="storage">Storage</TabsTrigger>
       </TabsList>
+      <TabsContent value="channels" className="mt-4 min-h-0 flex-1">
+        <ChannelsTab />
+      </TabsContent>
       <TabsContent value="storage" className="mt-4 min-h-0 flex-1">
         <StorageTab />
       </TabsContent>
