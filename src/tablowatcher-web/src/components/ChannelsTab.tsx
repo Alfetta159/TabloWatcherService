@@ -21,6 +21,23 @@ interface ChannelProgram {
   schedule: AiringSchedule | null
 }
 
+// "darkLarge" is a black logo, "lightLarge" a white one, "originalLarge" full colour.
+interface ChannelLogo {
+  kind: string
+  url: string
+}
+
+// Full colour reads on any background; otherwise the black one, for this light UI.
+const LOGO_PREFERENCE = ['originalLarge', 'darkLarge']
+
+function logoUrl(logos: ChannelLogo[]): string | null {
+  for (const kind of LOGO_PREFERENCE) {
+    const logo = logos.find((l) => l.kind === kind)
+    if (logo) return logo.url
+  }
+  return logos.find((l) => l.kind !== 'lightLarge')?.url ?? null
+}
+
 // GET /api/channels.
 interface ChannelInfo {
   objectId: number
@@ -38,6 +55,8 @@ interface ChannelInfo {
   tmsStationId: string
   tmsAffiliateId: string
   channelIdentifier: string
+  // Network logos on Tablo's CDN - most channels have none.
+  logos: ChannelLogo[]
   onNow: ChannelProgram | null
   upNext: ChannelProgram[]
   upcomingAiringCount: number
@@ -222,13 +241,24 @@ function ChannelDetail({
     ['Channel identifier', c.channelIdentifier],
     ['Tablo path', c.path],
   ].filter(([, value]) => value)
+  const logo = logoUrl(c.logos)
+  // A logo that fails to load is hidden rather than shown broken.
+  const [failedLogo, setFailedLogo] = useState<string | null>(null)
 
   return (
     // Stays in view while a long channel list scrolls.
     <Card className="sticky top-0 col-span-3 min-w-0">
       <CardHeader className="space-y-2">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          {logo && failedLogo !== logo && (
+            <img
+              src={logo}
+              alt={`${c.network || c.callSign} logo`}
+              className="h-12 w-20 shrink-0 object-contain"
+              onError={() => setFailedLogo(logo)}
+            />
+          )}
+          <div className="min-w-0 flex-1">
             <CardTitle className="text-2xl">
               {number(c)} {c.callSign}
             </CardTitle>

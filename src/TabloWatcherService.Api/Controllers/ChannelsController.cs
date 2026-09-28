@@ -95,6 +95,7 @@ public class ChannelsController(
                         tmsStationId = c.Channel.TmsStationId,
                         tmsAffiliateId = c.Channel.TmsAffiliateId,
                         channelIdentifier = c.Channel.ChannelIdentifier,
+                        logos = c.Channel.Logos.Select(l => new { kind = l.Kind, url = l.Url }),
                         onNow = onNow is null ? null : Program(onNow),
                         upNext = upcoming.Where(a => a != onNow).Take(UpNextCount).Select(Program),
                         upcomingAiringCount = upcoming.Count,

@@ -22,5 +22,16 @@ public class ChannelDetails
     public string TmsAffiliateId { get; set; } = string.Empty;
     public string ChannelIdentifier { get; set; } = string.Empty;
     public string Source { get; set; } = string.Empty;
-    public object[] Logos { get; set; } = [];
+    public ChannelLogo[] Logos { get; set; } = [];
+}
+
+/// <summary>
+/// A network logo hosted on Tablo's CDN. Devices seen so far send one of each kind:
+/// "darkLarge" (black, for light backgrounds), "lightLarge" (white, for dark backgrounds)
+/// and "originalLarge" (full colour). Most channels send none.
+/// </summary>
+public class ChannelLogo
+{
+    public string Kind { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
 }
