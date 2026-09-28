@@ -112,6 +112,8 @@ public interface IAiringsStore
     /// <summary>Sports event airings that haven't ended by <paramref name="now"/>, soonest first.</summary>
     IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now);
 
+    /// <summary>One series (by its path, e.g. "/guide/series/123") as in <see cref="GetUpcomingSeries(DateTime)"/>, or null if it has no upcoming airings.</summary>
+    UpcomingTitle<SeriesDetails>? GetUpcomingSeries(string seriesPath, DateTime now);
     /// <summary>One movie (by its path, e.g. "/guide/movies/123") as in <see cref="GetUpcomingMovies"/>, or null if it has no upcoming airings.</summary>
     UpcomingTitle<MovieDetails>? GetUpcomingMovie(string moviePath, DateTime now);
 

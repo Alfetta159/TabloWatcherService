@@ -1,5 +1,6 @@
 import { Film, MonitorPlay, Trophy } from 'lucide-react'
 import { MovieDetailDialog, SportsEventDetailDialog, type SportsEventDetail } from '@/components/DetailDialogs'
+import { SeriesDetailDialog } from '@/components/SeriesDetailDialog'
 import {
   PosterGridPage,
   type Artwork,
@@ -116,6 +117,10 @@ function sportsEventCard(event: SportsEvent): PosterCardData {
 }
 
 // Keyed by path so switching cards starts each dialog fresh.
+function tvShowDetail(show: TvShow, onChanged: () => void) {
+  return <SeriesDetailDialog key={show.path} path={show.path} onChanged={onChanged} />
+}
+
 function movieDetail(movie: Movie, onChanged: () => void) {
   return <MovieDetailDialog key={movie.path} path={movie.path} onChanged={onChanged} />
 }
@@ -132,6 +137,7 @@ export function TvShowsPage() {
       toCard={tvShowCard}
       placeholderIcon={MonitorPlay}
       facets={TV_SHOW_FACETS}
+      renderDetail={tvShowDetail}
     />
   )
 }

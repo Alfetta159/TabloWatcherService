@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using TabloWatcherService.Api.Models;
 
 namespace TabloWatcherService.Api.Services.Tablo;
@@ -62,6 +63,12 @@ public interface ITabloDeviceClient
 
     [Get("/guide/series/{seriesId}")]
     Task<ApiResponse<GuideSeries>> GetGuideSeriesByIdAsync(int seriesId);
+
+    // Changes a series' recording rule and options. The body's "schedule" is either the rule
+    // itself ("all", "new" or "none") or an object of options (channel_path, offsets) - never
+    // both in one request - alongside an optional "keep". Answers with the whole series.
+    [Patch("/guide/series/{seriesId}")]
+    Task<ApiResponse<GuideSeries>> UpdateGuideSeriesAsync(int seriesId, [Body] JsonObject changes);
 
     [Get("/guide/series/seasons/{seasonId}")]
     Task<ApiResponse<SeriesSeason>> GetSeriesSeasonAsync(int seasonId);
