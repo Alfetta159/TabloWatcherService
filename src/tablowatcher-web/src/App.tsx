@@ -361,7 +361,9 @@ function App() {
                           : 'No channels loaded yet'}
                     </p>
                     {selectedProgram?.description && (
-                      <p className="line-clamp-2 text-2xl opacity-80">{selectedProgram.description}</p>
+                      <p className="line-clamp-2 text-lg opacity-80" title={selectedProgram.description}>
+                        {selectedProgram.description}
+                      </p>
                     )}
                   </CardContent>
                   {selectedProgram?.thumbnailImageUrl && (
