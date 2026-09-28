@@ -20,12 +20,14 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GuideGrid, type SelectedProgram, type WatchedChannel } from '@/components/GuideGrid'
 import { LivePlayer } from '@/components/LivePlayer'
+import { RecordButton } from '@/components/Recording'
 import { ResizableSplit } from '@/components/ResizableSplit'
 import { RecordingsPage } from '@/components/RecordingsPage'
 import { SchedulePage } from '@/components/SchedulePage'
 import { SearchPage } from '@/components/SearchPage'
 import { SettingsPage } from '@/components/SettingsPage'
 import { MoviesPage, SportsPage, TvShowsPage } from '@/components/UpcomingPages'
+import { formatDuration } from '@/lib/format'
 
 interface WeatherForecast {
   date: string
@@ -89,6 +91,17 @@ interface TunerAssignment {
   channelObjectId: number
 }
 
+// The subset of GET /api/movies/{id} the Live TV preview pane shows for a selected movie
+// airing - description/cast/directors/runtime aren't in the guide grid response itself.
+interface SelectedMovieInfo {
+  moviePath: string
+  description: string | null
+  cast: string[]
+  directors: string[]
+  // Seconds.
+  runtime: number | null
+}
+
 // How often to re-read the device's tuners, to pick up channels other Tablo clients or
 // recordings have tuned.
 const TUNERS_POLL_INTERVAL_MS = 15_000
@@ -118,6 +131,7 @@ function App() {
   const [channelsLoading, setChannelsLoading] = useState(false)
   const [channelsError, setChannelsError] = useState<string | null>(null)
   const [selectedProgram, setSelectedProgram] = useState<SelectedProgram | null>(null)
+  const [movieInfo, setMovieInfo] = useState<SelectedMovieInfo | null>(null)
   const [watchedChannel, setWatchedChannel] = useState<WatchedChannel | null>(null)
   const [playlistUrl, setPlaylistUrl] = useState<string | null>(null)
   const [tuneError, setTuneError] = useState<string | null>(null)
@@ -244,6 +258,34 @@ function App() {
   }, [selectedNav, selectedServerId, servers])
 
   useEffect(() => {
+    const moviePath = selectedProgram?.moviePath
+    if (!moviePath) {
+      setMovieInfo(null)
+      return
+    }
+
+    let cancelled = false
+    const movieId = moviePath.split('/').pop()
+
+    fetch(`/api/movies/${movieId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`API returned ${res.status}`)
+        return res.json() as Promise<{ description: string | null; cast: string[]; directors: string[]; runtime: number | null }>
+      })
+      .then((d) => {
+        if (cancelled) return
+        setMovieInfo({ moviePath, description: d.description, cast: d.cast, directors: d.directors, runtime: d.runtime })
+      })
+      .catch(() => {
+        if (!cancelled) setMovieInfo(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedProgram?.moviePath])
+
+  useEffect(() => {
     const channelObjectId = watchedChannel?.objectId
     if (channelObjectId === undefined) return
 
@@ -278,6 +320,22 @@ function App() {
       cancelled = true
     }
   }, [watchedChannel?.objectId])
+
+  // The guide grid doesn't carry a movie's plot/cast/directors/runtime - only present
+  // once `movieInfo` catches up with `selectedProgram` (see the effect above).
+  const selectedMovieInfo = movieInfo?.moviePath === selectedProgram?.moviePath ? movieInfo : null
+  const previewDescription = selectedProgram?.description ?? selectedMovieInfo?.description ?? null
+  const previewMovieMeta = selectedMovieInfo
+    ? [
+        selectedMovieInfo.runtime ? formatDuration(selectedMovieInfo.runtime) : null,
+        selectedMovieInfo.directors.length > 0
+          ? `${selectedMovieInfo.directors.length === 1 ? 'Director' : 'Directors'}: ${selectedMovieInfo.directors.join(', ')}`
+          : null,
+        selectedMovieInfo.cast.length > 0 ? `Cast: ${selectedMovieInfo.cast.slice(0, 6).join(', ')}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null
 
   return (
     <Tabs
@@ -360,27 +418,49 @@ function App() {
                           ? `${channels.length} channels available`
                           : 'No channels loaded yet'}
                     </p>
-                    {selectedProgram?.description && (
-                      <p className="line-clamp-2 text-lg opacity-80" title={selectedProgram.description}>
-                        {selectedProgram.description}
+                    {previewDescription && (
+                      <p className="line-clamp-2 text-lg opacity-80" title={previewDescription}>
+                        {previewDescription}
+                      </p>
+                    )}
+                    {previewMovieMeta && (
+                      <p className="line-clamp-2 text-xs opacity-70" title={previewMovieMeta}>
+                        {previewMovieMeta}
                       </p>
                     )}
                   </CardContent>
-                  {selectedProgram?.thumbnailImageUrl && (
+                  {(selectedProgram?.thumbnailImageUrl || selectedProgram?.path) && (
                     // Takes whatever height is left under the text (so it never covers it) and
-                    // grows as the preview pane is dragged taller.
-                    <div className="relative flex min-h-0 flex-1 items-end px-(--card-spacing) pt-3 pb-(--card-spacing)">
-                      <img
-                        // Keyed so a poster that failed to load (404 - none on the device)
-                        // doesn't stay hidden for the next selection.
-                        key={selectedProgram.thumbnailImageUrl}
-                        src={selectedProgram.thumbnailImageUrl}
-                        alt=""
-                        className="h-full max-h-60 w-auto rounded-md shadow-lg ring-1 ring-white/20"
-                        onError={(e) => {
-                          e.currentTarget.hidden = true
-                        }}
-                      />
+                    // grows as the preview pane is dragged taller. The poster sits on the left,
+                    // the record button in the lower right.
+                    <div className="relative flex min-h-0 flex-1 items-end justify-between gap-3 px-(--card-spacing) pt-3 pb-(--card-spacing)">
+                      {selectedProgram?.thumbnailImageUrl ? (
+                        <img
+                          // Keyed so a poster that failed to load (404 - none on the device)
+                          // doesn't stay hidden for the next selection.
+                          key={selectedProgram.thumbnailImageUrl}
+                          src={selectedProgram.thumbnailImageUrl}
+                          alt=""
+                          className="h-full max-h-60 w-auto rounded-md shadow-lg ring-1 ring-white/20"
+                          onError={(e) => {
+                            e.currentTarget.hidden = true
+                          }}
+                        />
+                      ) : (
+                        <div />
+                      )}
+                      {selectedProgram?.path && (
+                        <RecordButton
+                          key={selectedProgram.path}
+                          path={selectedProgram.path}
+                          schedule={selectedProgram.schedule}
+                          onChanged={(updated) =>
+                            setSelectedProgram((prev) =>
+                              prev && prev.path === updated.path ? { ...prev, schedule: updated.schedule } : prev,
+                            )
+                          }
+                        />
+                      )}
                     </div>
                   )}
                 </div>
