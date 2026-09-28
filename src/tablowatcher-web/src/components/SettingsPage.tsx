@@ -104,15 +104,16 @@ const usageLoaded = (d: UsageResponse) => d.updatedAt !== null
 
 export function SettingsPage() {
   return (
+    // Each tab scrolls on its own, under the tab bar, so the bar stays in view.
     <Tabs defaultValue="channels" className="h-full">
-      <TabsList>
+      <TabsList className="shrink-0">
         <TabsTrigger value="channels">Channels</TabsTrigger>
         <TabsTrigger value="storage">Storage</TabsTrigger>
       </TabsList>
-      <TabsContent value="channels" className="mt-4 min-h-0 flex-1">
+      <TabsContent value="channels" className="mt-4 min-h-0 flex-1 overflow-y-auto">
         <ChannelsTab />
       </TabsContent>
-      <TabsContent value="storage" className="mt-4 min-h-0 flex-1">
+      <TabsContent value="storage" className="mt-4 min-h-0 flex-1 overflow-y-auto">
         <StorageTab />
       </TabsContent>
     </Tabs>
