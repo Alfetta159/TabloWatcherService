@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CardContent } from '@/components/ui/card'
+import type { AiringSchedule } from '@/lib/recording'
 
 interface ChannelDetails {
   callSign: string
@@ -38,6 +39,7 @@ interface GridAiring {
   seriesPath?: string | null
   episode?: EpisodeInfo | null
   movieAiring?: MovieAiringInfo | null
+  schedule?: AiringSchedule | null
 }
 
 interface GridChannel {
@@ -56,6 +58,13 @@ export interface SelectedProgram {
   description: string | null
   backgroundImageUrl: string | null
   thumbnailImageUrl: string | null
+  // Set when the selection is an actual airing (not just a channel with nothing on) -
+  // lets the preview pane offer to record it.
+  path: string | null
+  schedule: AiringSchedule | null
+  // Set when the airing is a movie - lets the preview pane fetch its full details
+  // (cast/directors/runtime) from GET /api/movies/{id}.
+  moviePath: string | null
 }
 
 export interface WatchedChannel {
@@ -90,6 +99,9 @@ function selectionForChannel(c: GridChannel): SelectedProgram {
       description: descriptionFor(nowPlaying),
       backgroundImageUrl: backgroundImageUrlFor(nowPlaying),
       thumbnailImageUrl: thumbnailImageUrlFor(nowPlaying),
+      path: nowPlaying.path,
+      schedule: nowPlaying.schedule ?? null,
+      moviePath: nowPlaying.moviePath ?? null,
     }
   }
 
@@ -99,6 +111,9 @@ function selectionForChannel(c: GridChannel): SelectedProgram {
     description: null,
     backgroundImageUrl: null,
     thumbnailImageUrl: null,
+    path: null,
+    schedule: null,
+    moviePath: null,
   }
 }
 
@@ -388,6 +403,9 @@ export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }
                           description: descriptionFor(a),
                           backgroundImageUrl: backgroundImageUrlFor(a),
                           thumbnailImageUrl: thumbnailImageUrlFor(a),
+                          path: a.path,
+                          schedule: a.schedule ?? null,
+                          moviePath: a.moviePath ?? null,
                         })
                       }}
                     >
