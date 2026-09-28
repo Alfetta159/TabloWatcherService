@@ -105,6 +105,11 @@ api.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
+// An /api URL no endpoint matched is a 404, not the SPA fallback below - otherwise it gets
+// index.html with a 200, which the frontend then fails to parse as JSON ("Unexpected token
+// '<'") instead of reporting the missing route (e.g. against a server built before it).
+api.Map("/{**path}", () => Results.NotFound());
+
 // Serves the built React SPA (wwwroot, produced by `npm run build` in src/tablowatcher-web).
 app.UseDefaultFiles();
 app.UseStaticFiles();
