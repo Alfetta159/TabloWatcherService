@@ -110,7 +110,7 @@ function DetailFrame({
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-2">
       <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{title}</h3>
@@ -119,7 +119,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-function Genres({ genres }: { genres: string[] }) {
+export function Genres({ genres }: { genres: string[] }) {
   return genres.length === 0 ? null : (
     <div className="flex flex-wrap gap-1">
       {genres.map((g) => (
