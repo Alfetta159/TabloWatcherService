@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { HardDrive as HardDriveIcon } from 'lucide-react'
+import { HardDrive as HardDriveIcon, TriangleAlert } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -172,10 +172,14 @@ function StorageTab() {
   )
 }
 
+// At or above this share of a drive's capacity, it's flagged as nearly full.
+const NEARLY_FULL_RATIO = 0.95
+
 function HardDriveCard({ drive, recordingsTotal }: { drive: HardDrive; recordingsTotal: number | null }) {
   // The device may reserve part of a drive; the limit is what it will actually fill.
   const capacity = drive.limit || drive.size
   const usedRatio = capacity > 0 ? Math.min(1, drive.usage / capacity) : 0
+  const nearlyFull = usedRatio >= NEARLY_FULL_RATIO
 
   return (
     <Card>
@@ -194,6 +198,12 @@ function HardDriveCard({ drive, recordingsTotal }: { drive: HardDrive; recording
             {drive.connected ? drive.busyState : 'Disconnected'}
           </Badge>
           {drive.formatState !== 'authorized' && <Badge variant="outline">{drive.formatState}</Badge>}
+          {nearlyFull && (
+            <Badge className="gap-1 bg-amber-100 text-amber-900" title={`${Math.round(usedRatio * 100)}% of this drive is used`}>
+              <TriangleAlert className="size-3" />
+              Almost full
+            </Badge>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -205,7 +215,7 @@ function HardDriveCard({ drive, recordingsTotal }: { drive: HardDrive; recording
             aria-valuemax={100}
             aria-valuenow={Math.round(usedRatio * 100)}
           >
-            <div className="h-full rounded-full" style={{ width: `${usedRatio * 100}%`, background: 'var(--series-1)' }} />
+            <div className="h-full rounded-full" style={{ width: `${usedRatio * 100}%`, background: nearlyFull ? 'var(--color-amber-500)' : 'var(--series-1)' }} />
           </div>
           <p className="text-muted-foreground text-xs">{Math.round(usedRatio * 100)}% used</p>
         </div>
