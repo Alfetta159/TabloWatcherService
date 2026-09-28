@@ -35,6 +35,7 @@ public partial class AiringsStore : IAiringsStore
         IReadOnlyList<TitleAirings<MovieDetails>> Movies,
         IReadOnlyList<UpcomingSportsEvent> SportsEvents,
         IReadOnlyDictionary<string, Airing> AiringsByPath,
+        IReadOnlyDictionary<string, TitleAirings<SeriesDetails>> SeriesByPath,
         IReadOnlyDictionary<string, TitleAirings<MovieDetails>> MoviesByPath,
         GuideDetails Details);
 
@@ -49,6 +50,7 @@ public partial class AiringsStore : IAiringsStore
     private volatile Snapshot _snapshot = new(
         [], [], [], [], [],
         new Dictionary<string, Airing>(),
+        new Dictionary<string, TitleAirings<SeriesDetails>>(),
         new Dictionary<string, TitleAirings<MovieDetails>>(),
         new GuideDetails(
             new Dictionary<string, GuideSeries>(),
@@ -125,6 +127,7 @@ public partial class AiringsStore : IAiringsStore
             movieAirings,
             sportsEvents,
             airings.DistinctBy(a => a.Path).ToDictionary(a => a.Path),
+            seriesAirings.ToDictionary(s => s.Path),
             movieAirings.ToDictionary(m => m.Path),
             details);
     }
@@ -199,6 +202,9 @@ public partial class AiringsStore : IAiringsStore
 
     public IReadOnlyList<UpcomingSportsEvent> GetUpcomingSportsEvents(DateTime now) =>
         _snapshot.SportsEvents.Where(e => HasNotEnded(e.Airing, now)).ToList();
+
+    public UpcomingTitle<SeriesDetails>? GetUpcomingSeries(string seriesPath, DateTime now) =>
+        _snapshot.SeriesByPath.TryGetValue(seriesPath, out var series) ? Upcoming([series], now).FirstOrDefault() : null;
 
     public UpcomingTitle<MovieDetails>? GetUpcomingMovie(string moviePath, DateTime now) =>
         _snapshot.MoviesByPath.TryGetValue(moviePath, out var movie) ? Upcoming([movie], now).FirstOrDefault() : null;

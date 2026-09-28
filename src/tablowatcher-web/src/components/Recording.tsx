@@ -3,6 +3,7 @@ import { CircleDot, LoaderCircle, TriangleAlert } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+  formatTimeRange,
   isScheduled,
   recordingStateOf,
   setScheduled,
@@ -23,14 +24,6 @@ export function RecordingPill({ state, className }: { state: RecordingState; cla
       Scheduled
     </Badge>
   )
-}
-
-function formatTimeRange(a: ScheduledAiring): string {
-  const start = new Date(a.datetime)
-  const end = new Date(start.getTime() + a.duration * 1000)
-  const day = start.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
-  const time = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  return `${day} · ${time(start)} – ${time(end)}`
 }
 
 function skipNote(schedule: AiringSchedule | null): string | null {
