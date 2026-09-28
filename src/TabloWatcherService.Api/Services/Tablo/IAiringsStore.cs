@@ -59,6 +59,12 @@ public record UpcomingSportsEvent(Airing Airing, SportDetails? Sport);
 /// </summary>
 public record ScheduledAiring(Airing Airing, SeriesDetails? Series, MovieDetails? Movie, SportDetails? Sport);
 
+/// <summary>
+/// One airing with the series, movie or sport it belongs to - whichever applies, if the
+/// device returned it.
+/// </summary>
+public record DetailedAiring(Airing Airing, SeriesDetails? Series, MovieDetails? Movie, SportDetails? Sport);
+
 /// <summary>The field names reported in <see cref="AiringSearchResult.MatchedFields"/>.</summary>
 public static class SearchFields
 {
@@ -124,6 +130,9 @@ public interface IAiringsStore
 
     /// <summary>An airing in the guide by its path, or null if the guide doesn't have it.</summary>
     Airing? GetAiring(string airingPath);
+
+    /// <summary>Likewise, with its series/movie/sport details (see <see cref="DetailedAiring"/>).</summary>
+    DetailedAiring? GetDetailedAiring(string airingPath);
 
     /// <summary>Every airing of a movie in the guide, past or upcoming.</summary>
     IReadOnlyList<Airing> GetMovieAirings(string moviePath);

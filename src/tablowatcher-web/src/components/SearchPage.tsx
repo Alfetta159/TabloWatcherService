@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { RecordButton, RecordingPill, ScheduleStatus } from '@/components/Recording'
+import { SearchDetailPanel } from '@/components/SearchDetailPanel'
 import { TagFilterControls } from '@/components/TagFilterControls'
 import { useTagFilters } from '@/hooks/useTagFilters'
 import { recordingStateOf, type AiringSchedule, type RecordingState } from '@/lib/recording'
@@ -154,6 +155,10 @@ export function SearchPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set())
+  // The result shown in the detail panel beside the list, if any.
+  const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  // Bumped each time the results are re-read, so the detail panel re-reads its result too.
+  const [reloadToken, setReloadToken] = useState(0)
   const tagFilters = useTagFilters('search')
 
   const groups = useMemo(() => {
@@ -182,7 +187,10 @@ export function SearchPage() {
         if (!res.ok) throw new Error(`API returned ${res.status}`)
         return res.json() as Promise<SearchResponse>
       })
-      .then(setResponse)
+      .then((r) => {
+        setResponse(r)
+        setReloadToken((t) => t + 1)
+      })
       .catch((err) => setError(err.message))
   }
 
@@ -193,6 +201,7 @@ export function SearchPage() {
 
     setLoading(true)
     setError(null)
+    setSelectedPath(null)
     runSearch(q).finally(() => setLoading(false))
   }
 
@@ -204,119 +213,137 @@ export function SearchPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <form onSubmit={search} className="flex gap-2">
-        <Input
-          type="search"
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          placeholder="Search titles, episodes, actors, directors and descriptions"
-          aria-label="Search the guide"
-          maxLength={100}
-          autoFocus
-        />
-        <Button type="submit" disabled={loading || !term.trim()}>
-          {loading ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
-          Search
-        </Button>
-      </form>
+    <div className={`mx-auto flex w-full items-start gap-6 ${selectedPath ? 'max-w-6xl' : 'max-w-2xl'}`}>
+      <div className="min-w-0 flex-1 space-y-6">
+        <form onSubmit={search} className="flex gap-2">
+          <Input
+            type="search"
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            placeholder="Search titles, episodes, actors, directors and descriptions"
+            aria-label="Search the guide"
+            maxLength={100}
+            autoFocus
+          />
+          <Button type="submit" disabled={loading || !term.trim()}>
+            {loading ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
+            Search
+          </Button>
+        </form>
 
-      <div className="flex flex-wrap items-end gap-4">
-        <TagFilterControls {...tagFilters} />
-      </div>
+        <div className="flex flex-wrap items-end gap-4">
+          <TagFilterControls {...tagFilters} />
+        </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertTitle>Search failed</AlertTitle>
-          <AlertDescription>/api/search returned an error: {error}</AlertDescription>
-        </Alert>
-      )}
+        {error && (
+          <Alert variant="destructive">
+            <AlertTitle>Search failed</AlertTitle>
+            <AlertDescription>/api/search returned an error: {error}</AlertDescription>
+          </Alert>
+        )}
 
-      {response && !response.updatedAt && (
-        <Alert>
-          <AlertTitle>The guide is still loading</AlertTitle>
-          <AlertDescription>The server hasn't finished reading the guide from the Tablo yet. Try again shortly.</AlertDescription>
-        </Alert>
-      )}
+        {response && !response.updatedAt && (
+          <Alert>
+            <AlertTitle>The guide is still loading</AlertTitle>
+            <AlertDescription>The server hasn't finished reading the guide from the Tablo yet. Try again shortly.</AlertDescription>
+          </Alert>
+        )}
 
-      {response?.updatedAt && (
-        <p className="text-muted-foreground text-sm">
-          {visibleAiringCount === 0
-            ? `Nothing upcoming matches "${response.query}".`
-            : `${visibleAiringCount} airing${visibleAiringCount === 1 ? '' : 's'} of ${groups.length} show${groups.length === 1 ? '' : 's'} match "${response.query}"` +
-              (response.totalCount > response.results.length ? ` (showing the first ${response.results.length})` : '') +
-              '.'}
-        </p>
-      )}
+        {response?.updatedAt && (
+          <p className="text-muted-foreground text-sm">
+            {visibleAiringCount === 0
+              ? `Nothing upcoming matches "${response.query}".`
+              : `${visibleAiringCount} airing${visibleAiringCount === 1 ? '' : 's'} of ${groups.length} show${groups.length === 1 ? '' : 's'} match "${response.query}"` +
+                (response.totalCount > response.results.length ? ` (showing the first ${response.results.length})` : '') +
+                '.'}
+          </p>
+        )}
 
-      {response &&
-        groups.map((group) => {
-          const collapsed = collapsedKeys.has(group.key)
-          const groupState = groupRecordingState(group)
-          return (
-            <Card key={group.key}>
-              <CardHeader className="space-y-2">
-                <button
-                  type="button"
-                  className="flex w-full items-start justify-between gap-2 text-left"
-                  onClick={() => toggleCollapsed(group.key)}
-                  aria-expanded={!collapsed}
-                >
-                  <div className="flex items-start gap-1.5">
-                    {collapsed ? (
-                      <ChevronRight className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
-                    ) : (
-                      <ChevronDown className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+        {response &&
+          groups.map((group) => {
+            const collapsed = collapsedKeys.has(group.key)
+            const groupState = groupRecordingState(group)
+            return (
+              <Card key={group.key}>
+                <CardHeader className="space-y-2">
+                  <button
+                    type="button"
+                    className="flex w-full items-start justify-between gap-2 text-left"
+                    onClick={() => toggleCollapsed(group.key)}
+                    aria-expanded={!collapsed}
+                  >
+                    <div className="flex items-start gap-1.5">
+                      {collapsed ? (
+                        <ChevronRight className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+                      ) : (
+                        <ChevronDown className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+                      )}
+                      <CardTitle>{highlight(group.title, response.query)}</CardTitle>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {groupState && <RecordingPill state={groupState} />}
+                      <Badge variant="outline">{group.kind}</Badge>
+                    </div>
+                  </button>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="text-muted-foreground">Matched:</span>
+                    {[...group.matchedFields].map((f) => (
+                      <Badge key={f} variant="secondary">
+                        {FIELD_LABELS[f]}
+                      </Badge>
+                    ))}
+                    {group.matchedCast.size > 0 && (
+                      <span className="text-muted-foreground">({[...group.matchedCast].join(', ')})</span>
                     )}
-                    <CardTitle>{highlight(group.title, response.query)}</CardTitle>
+                    {group.matchedDirectors.size > 0 && (
+                      <span className="text-muted-foreground">({[...group.matchedDirectors].join(', ')})</span>
+                    )}
                   </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {groupState && <RecordingPill state={groupState} />}
-                    <Badge variant="outline">{group.kind}</Badge>
-                  </div>
-                </button>
-                <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                  <span className="text-muted-foreground">Matched:</span>
-                  {[...group.matchedFields].map((f) => (
-                    <Badge key={f} variant="secondary">
-                      {FIELD_LABELS[f]}
-                    </Badge>
-                  ))}
-                  {group.matchedCast.size > 0 && (
-                    <span className="text-muted-foreground">({[...group.matchedCast].join(', ')})</span>
-                  )}
-                  {group.matchedDirectors.size > 0 && (
-                    <span className="text-muted-foreground">({[...group.matchedDirectors].join(', ')})</span>
-                  )}
-                </div>
-              </CardHeader>
-              {!collapsed && (
-                <CardContent className="divide-y text-sm">
-                  {group.results.map(({ airing }) => {
-                    const label = episodeLabel(airing)
-                    const description = airing.episode?.description || airing.event?.description
-                    return (
-                      <div key={airing.path} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <span className="font-medium">{formatAiringTime(airing)}</span>
-                            <span className="text-muted-foreground">{formatChannel(airing)}</span>
-                            <ScheduleStatus schedule={airing.schedule ?? null} />
-                          </div>
-                          {label && <p>{highlight(label, response.query)}</p>}
-                          {description && (
-                            <p className="text-muted-foreground line-clamp-2">{highlight(description, response.query)}</p>
-                          )}
+                </CardHeader>
+                {!collapsed && (
+                  <CardContent className="divide-y text-sm">
+                    {group.results.map(({ airing }) => {
+                      const label = episodeLabel(airing)
+                      const description = airing.episode?.description || airing.event?.description
+                      return (
+                        <div key={airing.path} className="flex items-start justify-between gap-4 py-1.5 first:pt-0 last:pb-0">
+                          <button
+                            type="button"
+                            className={`hover:bg-accent/60 -mx-2 min-w-0 flex-1 space-y-1 rounded-md px-2 py-1.5 text-left ${selectedPath === airing.path ? 'bg-accent' : ''}`}
+                            onClick={() => setSelectedPath(airing.path)}
+                            aria-pressed={selectedPath === airing.path}
+                          >
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                              <span className="font-medium">{formatAiringTime(airing)}</span>
+                              <span className="text-muted-foreground">{formatChannel(airing)}</span>
+                              <ScheduleStatus schedule={airing.schedule ?? null} />
+                            </div>
+                            {label && <p>{highlight(label, response.query)}</p>}
+                            {description && (
+                              <p className="text-muted-foreground line-clamp-2">{highlight(description, response.query)}</p>
+                            )}
+                          </button>
+                          <RecordButton path={airing.path} schedule={airing.schedule ?? null} onChanged={refreshResults} />
                         </div>
-                        <RecordButton path={airing.path} schedule={airing.schedule ?? null} onChanged={refreshResults} />
-                      </div>
-                    )
-                  })}
-                </CardContent>
-              )}
-            </Card>
-          )
-        })}
+                      )
+                    })}
+                  </CardContent>
+                )}
+              </Card>
+            )
+          })}
+      </div>
+      {selectedPath && (
+        // Stays in view while the results scroll, scrolling itself if it's taller than the page.
+        <aside className="sticky top-0 max-h-[calc(100vh-7.5rem)] w-[26rem] max-w-[45%] shrink-0 overflow-y-auto">
+          <SearchDetailPanel
+            path={selectedPath}
+            reloadToken={reloadToken}
+            onChanged={refreshResults}
+            onClose={() => setSelectedPath(null)}
+          />
+        </aside>
+      )}
     </div>
   )
 }

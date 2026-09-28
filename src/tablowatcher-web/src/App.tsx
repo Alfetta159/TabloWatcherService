@@ -51,7 +51,7 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 // Pages that use the whole width of the main area rather than a narrow centered column.
-const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports', 'Recordings', 'Scheduled', 'Settings'])
+const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports', 'Recordings', 'Scheduled', 'Search', 'Settings'])
 
 interface ChannelDetails {
   callSign: string

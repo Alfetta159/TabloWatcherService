@@ -227,6 +227,18 @@ public partial class AiringsStore : IAiringsStore
 
     public Airing? GetAiring(string airingPath) => _snapshot.AiringsByPath.GetValueOrDefault(airingPath);
 
+    public DetailedAiring? GetDetailedAiring(string airingPath)
+    {
+        var snapshot = _snapshot;
+        return snapshot.AiringsByPath.TryGetValue(airingPath, out var airing)
+            ? new DetailedAiring(
+                airing,
+                SeriesFor(airing, snapshot.Details),
+                MovieFor(airing, snapshot.Details),
+                SportFor(airing, snapshot.Details))
+            : null;
+    }
+
     public IReadOnlyList<Airing> GetMovieAirings(string moviePath) =>
         _snapshot.MoviesByPath.TryGetValue(moviePath, out var movie) ? movie.Airings : [];
 
