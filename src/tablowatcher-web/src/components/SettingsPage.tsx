@@ -104,7 +104,7 @@ const usageLoaded = (d: UsageResponse) => d.updatedAt !== null
 
 export function SettingsPage() {
   return (
-    <Tabs defaultValue="storage" className="h-full">
+    <Tabs defaultValue="channels" className="h-full">
       <TabsList>
         <TabsTrigger value="channels">Channels</TabsTrigger>
         <TabsTrigger value="storage">Storage</TabsTrigger>
