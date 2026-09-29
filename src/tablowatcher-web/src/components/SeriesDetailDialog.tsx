@@ -198,7 +198,6 @@ export function SeriesDetailDialog({ path, onChanged }: { path: string; onChange
               {series.seasons.map((s) => (
                 <TabsTrigger key={seasonLabel(s.number)} value={seasonLabel(s.number)}>
                   {seasonLabel(s.number)}
-                  <span className="text-muted-foreground ml-1 tabular-nums">{s.episodes.length}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
