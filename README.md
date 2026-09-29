@@ -38,11 +38,41 @@ Search allows you to search by title, actor, director or any keyword that might 
 ## Requirements
 
 - A legacy Tablo DVR on the same network as the machine running this app.
-- To run it: the [ASP.NET Core 10 runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+- To run it: the [ASP.NET Core 10 runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
+  (not needed with the Linux packages below, which bundle it).
 - To build it: the .NET 10 SDK and Node.js 20.19+ or 22.12+ (required by Vite).
 - A current browser (Chrome, Edge, Firefox or Safari). Live video streams straight from
   the Tablo to the browser, so the browser must also be able to reach the Tablo on the
   network.
+
+## Installing on Linux
+
+Download the package for your system from the
+[Releases](https://github.com/Alfetta159/TabloWatcherService/releases) page: `.deb` for
+Debian, Ubuntu, Mint and Raspberry Pi OS; `.rpm` for Fedora and openSUSE. Pick `amd64` /
+`x86_64` for a typical PC, or `arm64` / `aarch64` for a 64-bit Raspberry Pi. The packages
+bundle the .NET runtime, so there's nothing else to install first.
+
+```bash
+sudo apt install ./tablowatcherservice_<version>_amd64.deb
+```
+
+```bash
+sudo dnf install ./tablowatcherservice-<version>-1.x86_64.rpm
+```
+
+This installs the app to `/opt/tablowatcherservice` and starts it as the
+`tablowatcherservice` service (see [Linux (systemd)](#linux-systemd) for checking on it),
+which also starts at boot. Open `http://localhost:8080`, or **Tablo Watcher** in your app
+menu. Installing a newer package upgrades in place and keeps your settings.
+
+If you previously installed with `deploy/install.sh`, first delete the unit file it
+installed (`sudo rm /etc/systemd/system/tablowatcherservice.service`). Otherwise it takes
+precedence over the package's own unit file.
+
+To uninstall, run `sudo apt remove tablowatcherservice` or `sudo dnf remove tablowatcherservice`.
+Your settings stay in `/opt/tablowatcherservice` in case you reinstall; `sudo apt purge
+tablowatcherservice` removes them too.
 
 ## Architecture
 
@@ -159,6 +189,28 @@ for the API directly).
 
 A plain `dotnet build` or `dotnet run` doesn't rebuild the SPA; only `publish` does (or run
 `npm run build` yourself).
+
+### Linux packages
+
+```bash
+packaging/build-packages.sh 0.1.0-preview1          # amd64 + arm64, .deb + .rpm
+packaging/build-packages.sh 0.1.0-preview1 amd64    # just one architecture
+```
+
+This does a self-contained publish (the .NET runtime is bundled) for each architecture and
+packages it with [nFPM](https://nfpm.goreleaser.com/install/), which you need installed.
+Packages and a `SHA256SUMS` file land in `packaging/dist/`. The package definition is
+[packaging/nfpm.yaml](packaging/nfpm.yaml), with the systemd unit, app-menu launcher and
+install/remove scripts in [packaging/linux](packaging/linux).
+
+To publish a release, push a version tag. The [Release workflow](.github/workflows/release.yml)
+builds the packages and attaches them to a GitHub release. A tag with a `-` suffix (like
+`v0.1.0-preview1`) becomes a pre-release:
+
+```bash
+git tag v0.1.0-preview1
+git push origin v0.1.0-preview1
+```
 
 ## Running as a service
 

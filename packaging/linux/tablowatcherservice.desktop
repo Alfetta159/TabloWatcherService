@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Tablo Watcher
+Comment=Watch and configure recordings on your Tablo DVR
+# The app itself runs as a background service; this just opens it in the default browser.
+Exec=xdg-open http://localhost:8080
+Icon=tablowatcherservice
+Terminal=false
+Categories=AudioVideo;Video;TV;
