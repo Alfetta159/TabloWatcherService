@@ -51,5 +51,8 @@ jobs:
         run: |
           prerelease=()
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
+          # Download instructions (with this version's file names) go above the generated
+          # list of changes - gh prepends --notes to the generated notes.
+          notes="$(sed "s/@VERSION@/${GITHUB_REF_NAME#v}/g" packaging/release-notes.md)"
           gh release create "$GITHUB_REF_NAME" packaging/dist/* \
-            --title "$GITHUB_REF_NAME" --generate-notes "${prerelease[@]}"
+            --title "$GITHUB_REF_NAME" --notes "$notes" --generate-notes "${prerelease[@]}"

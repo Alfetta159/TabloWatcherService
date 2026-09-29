@@ -205,8 +205,10 @@ Packages and a `SHA256SUMS` file land in `packaging/dist/`. The package definiti
 install/remove scripts in [packaging/linux](packaging/linux).
 
 To publish a release, push a version tag. The [Release workflow](.github/workflows/release.yml)
-builds the packages and attaches them to a GitHub release. A tag with a `-` suffix (like
-`v0.1.0-preview1`) becomes a pre-release:
+builds the packages and attaches them to a GitHub release, whose notes start with download
+and install instructions from [packaging/release-notes.md](packaging/release-notes.md)
+(`@VERSION@` is filled in with the tag's version) above the generated list of changes. A tag
+with a `-` suffix (like `v0.1.0-preview1`) becomes a pre-release:
 
 ```bash
 git tag v0.1.0-preview1
