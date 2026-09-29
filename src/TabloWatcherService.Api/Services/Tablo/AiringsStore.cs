@@ -336,9 +336,16 @@ public partial class AiringsStore : IAiringsStore
             .Where(t => t.Channels.Count > 0)
             .ToList();
 
-    // Sorts "The Office" with the Os, like a TV guide or library would.
+    // Sorts "The Office" with the Os and "M*A*S*H" as "MASH", like a TV guide or library would.
     private static string SortableTitle(string title)
     {
+        var stripped = string.Join(' ', new string([.. title.Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c))])
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (stripped.Length > 0)
+        {
+            title = stripped;
+        }
+
         foreach (var article in (string[])["The ", "A ", "An "])
         {
             if (title.StartsWith(article, StringComparison.OrdinalIgnoreCase) && title.Length > article.Length)
