@@ -70,7 +70,7 @@ curl -sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/cfg/
 sudo dnf install tablowatcherservice
 ```
 
-Package repository hosting is provided by [Cloudsmith](https://cloudsmith.com).
+Package repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
 
 ### From a downloaded package
 
