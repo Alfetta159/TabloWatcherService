@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { LivePlayer } from '@/components/LivePlayer'
 import type { ChannelInfo } from '@/components/PosterGridPage'
-import { postRecordingAction } from '@/lib/recording'
+import { postRecordingAction, resumePosition, startRecordingStream } from '@/lib/recording'
 import { formatClock, formatDuration, formatRating, formatSize, formatStars } from '@/lib/format'
 
 // GET /api/recordings/movies/{id} or /api/recordings/sports/{id}: the shared fields,
@@ -63,11 +63,6 @@ interface PlayRequest {
   path: string
   startAt: number
   attempt: number
-}
-
-// Where to pick up a recording: where it was left off, unless it was finished (or barely started).
-function resumePosition(recording: Recording): number {
-  return !recording.watched && recording.position > 30 ? recording.position : 0
 }
 
 function formatDate(datetime: string): string {
@@ -167,17 +162,9 @@ export function RecordingPlayerDialog({
   useEffect(() => {
     if (!playRequest) return
     let cancelled = false
-    fetch('/api/recordings/watch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: playRequest.path }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(res.status === 502 ? "the Tablo didn't respond - try again" : `API returned ${res.status}`)
-        return res.json() as Promise<{ playlistUrl: string }>
-      })
-      .then((d) => {
-        if (!cancelled) setPlaylistUrl(d.playlistUrl)
+    startRecordingStream(playRequest.path)
+      .then((url) => {
+        if (!cancelled) setPlaylistUrl(url)
       })
       .catch((err) => {
         if (!cancelled) setWatchError(err.message)

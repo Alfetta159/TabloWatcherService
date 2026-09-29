@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, LoaderCircle, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, LoaderCircle, Play, RotateCcw, Shield, ShieldCheck, Trash2, X } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -7,9 +7,10 @@ import { DialogContent, DialogDescription, DialogTitle } from '@/components/ui/d
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Genres, Section } from '@/components/DetailDialogs'
+import { LivePlayer } from '@/components/LivePlayer'
 import type { ChannelInfo } from '@/components/PosterGridPage'
-import { formatDuration, formatRating, formatSize } from '@/lib/format'
-import { postRecordingAction } from '@/lib/recording'
+import { formatClock, formatDuration, formatRating, formatSize } from '@/lib/format'
+import { postRecordingAction, resumePosition, startRecordingStream, updateRecording } from '@/lib/recording'
 
 // One recorded episode (or program airing).
 interface ShowRecording {
@@ -21,6 +22,10 @@ interface ShowRecording {
   duration: number
   size: number
   watched: boolean
+  // Kept from being deleted, automatically (by the series' keep rule) or from here.
+  protected: boolean
+  // Seconds in, where playback last left off.
+  position: number
   episodeNumber: number | null
   title: string | null
   description: string | null
@@ -51,11 +56,13 @@ interface PendingDelete {
   // What's being deleted, e.g. "watched" or "Season 2".
   label: string
   recordings: ShowRecording[]
+  // Protected recordings it would otherwise have included, which are kept.
+  keptProtected: number
 }
 
 // "Delete the 2 failed recordings (1 MB)...", "Delete all 18 recordings...", "Delete the 3
 // recordings in Season 2..."
-function confirmPrompt({ label, recordings }: PendingDelete): string {
+function confirmPrompt({ label, recordings, keptProtected }: PendingDelete): string {
   const n = recordings.length
   const size = formatSize(recordings.reduce((sum, r) => sum + r.size, 0))
   const what =
@@ -64,7 +71,8 @@ function confirmPrompt({ label, recordings }: PendingDelete): string {
       : label === 'watched' || label === 'failed'
         ? `the ${n} ${label} recording${n === 1 ? '' : 's'}`
         : `the ${countLabel(n)} in ${label}`
-  return `Delete ${what} (${size}) from the Tablo? This can't be undone.`
+  const kept = keptProtected > 0 ? ` ${keptProtected === 1 ? '1 protected recording is' : `${keptProtected} protected recordings are`} kept.` : ''
+  return `Delete ${what} (${size}) from the Tablo?${kept} This can't be undone.`
 }
 
 function seasonLabel(number: number | null): string {
@@ -75,9 +83,15 @@ function formatDate(datetime: string): string {
   return new Date(datetime).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-// The device refuses to delete a recording still in progress.
-const deletable = (r: ShowRecording) => r.state !== 'recording'
+// The device refuses to delete a recording still in progress; protected ones have to be
+// unprotected first, so a bulk delete can't take them along by accident.
+const deletable = (r: ShowRecording) => r.state !== 'recording' && !r.protected
 const isFailed = (r: ShowRecording) => r.state === 'failed'
+
+// A bulk delete of whichever of `recordings` can be deleted.
+function pendingDelete(label: string, recordings: ShowRecording[]): PendingDelete {
+  return { label, recordings: recordings.filter(deletable), keptProtected: recordings.filter((r) => r.protected).length }
+}
 
 function countLabel(count: number): string {
   return `${count} recording${count === 1 ? '' : 's'}`
@@ -109,6 +123,12 @@ export function RecordedShowDialog({
   // Why each recording that couldn't be deleted wasn't.
   const [errors, setErrors] = useState<Map<string, string>>(new Map())
   const [posterFailed, setPosterFailed] = useState(false)
+  // The one recording playing in its row's viewer.
+  const [watchingPath, setWatchingPath] = useState<string | null>(null)
+  // Recordings being marked watched/unwatched or protected/unprotected right now.
+  const [updating, setUpdating] = useState<Set<string>>(new Set())
+  // Why each recording that couldn't be marked wasn't.
+  const [updateErrors, setUpdateErrors] = useState<Map<string, string>>(new Map())
   // Focus the dialog itself on open rather than its first button.
   const popupRef = useRef<HTMLDivElement>(null)
 
@@ -146,10 +166,10 @@ export function RecordedShowDialog({
   const busy = progress !== null
   const all = show.seasons.flatMap((s) => s.recordings)
   const totalSize = all.reduce((sum, r) => sum + r.size, 0)
-  const bulkOptions: PendingDelete[] = [
-    { label: 'all', recordings: all.filter(deletable) },
-    { label: 'watched', recordings: all.filter((r) => r.watched && deletable(r)) },
-    { label: 'failed', recordings: all.filter((r) => isFailed(r) && deletable(r)) },
+  const bulkOptions = [
+    pendingDelete('all', all),
+    pendingDelete('watched', all.filter((r) => r.watched)),
+    pendingDelete('failed', all.filter(isFailed)),
   ]
 
   // One at a time - the device's embedded server doesn't cope well with a burst of requests.
@@ -180,6 +200,40 @@ export function RecordedShowDialog({
     if (seasons.length === 0) onEmpty()
   }
 
+  // Marks one recording watched/unwatched or protected/unprotected, then shows it as the device
+  // now reports it.
+  async function update(recording: ShowRecording, change: { watched?: boolean; protected?: boolean }) {
+    const { path } = recording
+    setUpdating((prev) => new Set(prev).add(path))
+    setUpdateErrors((prev) => {
+      const next = new Map(prev)
+      next.delete(path)
+      return next
+    })
+    try {
+      const updated = await updateRecording<ShowRecording>(path, change)
+      setShow((current) =>
+        current && {
+          ...current,
+          seasons: current.seasons.map((s) => ({
+            ...s,
+            recordings: s.recordings.map((r) => (r.path === path ? updated : r)),
+          })),
+        },
+      )
+      // The page's cards show unwatched counts.
+      onChanged()
+    } catch (err) {
+      setUpdateErrors((prev) => new Map(prev).set(path, (err as Error).message))
+    } finally {
+      setUpdating((prev) => {
+        const next = new Set(prev)
+        next.delete(path)
+        return next
+      })
+    }
+  }
+
   const meta = [
     show.origAirDate && new Date(`${show.origAirDate}T00:00`).getFullYear(),
     formatRating(show.seriesRating),
@@ -202,11 +256,16 @@ export function RecordedShowDialog({
       confirmingPath={confirmingPath}
       onConfirm={setConfirmingPath}
       onDelete={(r) => deleteRecordings([r])}
+      watchingPath={watchingPath}
+      onWatch={setWatchingPath}
+      updating={updating}
+      updateErrors={updateErrors}
+      onUpdate={update}
       onDeleteSeason={
         showTabs
           ? () => {
               setConfirmingPath(null)
-              setPending({ label: seasonLabel(s.number), recordings: s.recordings.filter(deletable) })
+              setPending(pendingDelete(seasonLabel(s.number), s.recordings))
             }
           : undefined
       }
@@ -344,6 +403,7 @@ function SeasonRecordings({
   onConfirm,
   onDelete,
   onDeleteSeason,
+  ...rowProps
 }: {
   recordings: ShowRecording[]
   busy: boolean
@@ -353,6 +413,9 @@ function SeasonRecordings({
   onDelete: (recording: ShowRecording) => void
   // Absent when there's only the one list, which the Delete menu already covers.
   onDeleteSeason?: () => void
+} & Pick<RowProps, 'watchingPath' | 'onWatch' | 'onUpdate'> & {
+  updating: Set<string>
+  updateErrors: Map<string, string>
 }) {
   const size = recordings.reduce((sum, r) => sum + r.size, 0)
   const deletableCount = recordings.filter(deletable).length
@@ -380,11 +443,32 @@ function SeasonRecordings({
             confirming={confirmingPath === r.path}
             onConfirm={onConfirm}
             onDelete={onDelete}
+            watchingPath={rowProps.watchingPath}
+            onWatch={rowProps.onWatch}
+            updating={rowProps.updating.has(r.path)}
+            updateError={rowProps.updateErrors.get(r.path)}
+            onUpdate={rowProps.onUpdate}
           />
         ))}
       </div>
     </div>
   )
+}
+
+interface RowProps {
+  recording: ShowRecording
+  busy: boolean
+  error: string | undefined
+  confirming: boolean
+  onConfirm: (path: string | null) => void
+  onDelete: (recording: ShowRecording) => void
+  // The recording playing in its row's viewer, if any - only one plays at a time.
+  watchingPath: string | null
+  onWatch: (path: string | null) => void
+  // Being marked watched/unwatched or protected/unprotected right now.
+  updating: boolean
+  updateError: string | undefined
+  onUpdate: (recording: ShowRecording, change: { watched?: boolean; protected?: boolean }) => void
 }
 
 function RecordingRow({
@@ -394,68 +478,165 @@ function RecordingRow({
   confirming,
   onConfirm,
   onDelete,
-}: {
-  recording: ShowRecording
-  busy: boolean
-  error: string | undefined
-  confirming: boolean
-  onConfirm: (path: string | null) => void
-  onDelete: (recording: ShowRecording) => void
-}) {
+  watchingPath,
+  onWatch,
+  updating,
+  updateError,
+  onUpdate,
+}: RowProps) {
   const inProgress = r.state === 'recording'
+  const watching = watchingPath === r.path
   // A program's airings have no episode titles, so they go by when they were recorded.
   const datedHeading = r.title === null && r.episodeNumber === null
+  const deleteTitle = inProgress
+    ? 'Stop the recording before deleting it'
+    : r.protected
+      ? 'Unprotect this recording before deleting it'
+      : 'Delete this recording'
 
   return (
-    <div className="flex items-start justify-between gap-4 px-4 py-3">
-      <div className="min-w-0 space-y-1">
-        <p className="font-medium">
-          {r.episodeNumber !== null && <span className="text-muted-foreground mr-1.5 tabular-nums">E{r.episodeNumber}</span>}
-          {datedHeading ? `Recorded ${formatDate(r.recordedAt)}` : (r.title ?? 'Untitled episode')}
-        </p>
-        {r.description && <p className="text-muted-foreground line-clamp-2">{r.description}</p>}
-        <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
-          <span>
-            {[
-              datedHeading ? null : `Recorded ${formatDate(r.recordedAt)}`,
-              `${r.channel.major}.${r.channel.minor} ${r.channel.callSign}`,
-              r.duration > 0 ? formatDuration(r.duration) : null,
-              formatSize(r.size),
-              r.watched ? 'Watched' : 'Unwatched',
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </span>
-          {inProgress && <Badge variant="destructive">Recording</Badge>}
-          {isFailed(r) && <Badge variant="destructive">Failed</Badge>}
-          {r.state && r.state !== 'finished' && !inProgress && !isFailed(r) && <Badge variant="outline">{r.state}</Badge>}
+    <div className="space-y-3 px-4 py-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <p className="font-medium">
+            {r.episodeNumber !== null && <span className="text-muted-foreground mr-1.5 tabular-nums">E{r.episodeNumber}</span>}
+            {datedHeading ? `Recorded ${formatDate(r.recordedAt)}` : (r.title ?? 'Untitled episode')}
+          </p>
+          {r.description && <p className="text-muted-foreground line-clamp-2">{r.description}</p>}
+          <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+            <span>
+              {[
+                datedHeading ? null : `Recorded ${formatDate(r.recordedAt)}`,
+                `${r.channel.major}.${r.channel.minor} ${r.channel.callSign}`,
+                r.duration > 0 ? formatDuration(r.duration) : null,
+                formatSize(r.size),
+                r.watched ? 'Watched' : resumePosition(r) > 0 ? `Stopped at ${formatClock(r.position)}` : 'Unwatched',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+            {r.protected && <Badge variant="secondary">Protected</Badge>}
+            {inProgress && <Badge variant="destructive">Recording</Badge>}
+            {isFailed(r) && <Badge variant="destructive">Failed</Badge>}
+            {r.state && r.state !== 'finished' && !inProgress && !isFailed(r) && <Badge variant="outline">{r.state}</Badge>}
+          </div>
+          {error && <p className="text-destructive text-xs">Couldn't delete: {error}</p>}
+          {updateError && <p className="text-destructive text-xs">Couldn't update: {updateError}</p>}
         </div>
-        {error && <p className="text-destructive text-xs">Couldn't delete: {error}</p>}
+        <div className="flex shrink-0 items-center gap-1">
+          {confirming ? (
+            <>
+              <Button size="sm" variant="destructive" disabled={busy} onClick={() => onDelete(r)}>
+                {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                Delete
+              </Button>
+              <Button size="sm" variant="outline" disabled={busy} onClick={() => onConfirm(null)}>
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                size="sm"
+                variant={watching ? 'secondary' : 'outline'}
+                className="mr-1"
+                onClick={() => onWatch(watching ? null : r.path)}
+              >
+                {watching ? <X className="size-4" /> : <Play className="size-4" />}
+                {watching ? 'Close' : 'Watch'}
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                disabled={busy || updating}
+                className={r.watched ? 'text-primary' : undefined}
+                title={r.watched ? 'Mark as unwatched' : 'Mark as watched'}
+                aria-label="Watched"
+                aria-pressed={r.watched}
+                onClick={() => onUpdate(r, { watched: !r.watched })}
+              >
+                <Check className="size-4" />
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                disabled={busy || updating}
+                className={r.protected ? 'text-primary' : undefined}
+                title={r.protected ? 'Unprotect - allow it to be deleted' : 'Protect - keep it from being deleted'}
+                aria-label="Protected"
+                aria-pressed={r.protected}
+                onClick={() => onUpdate(r, { protected: !r.protected })}
+              >
+                {r.protected ? <ShieldCheck className="size-4" /> : <Shield className="size-4" />}
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                disabled={busy || inProgress || r.protected}
+                title={deleteTitle}
+                aria-label="Delete this recording"
+                onClick={() => onConfirm(r.path)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </>
+          )}
+        </div>
       </div>
-      <div className="flex shrink-0 gap-2">
-        {confirming ? (
-          <>
-            <Button size="sm" variant="destructive" disabled={busy} onClick={() => onDelete(r)}>
-              {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-              Delete
-            </Button>
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => onConfirm(null)}>
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            disabled={busy || inProgress}
-            title={inProgress ? 'Stop the recording before deleting it' : 'Delete this recording'}
-            aria-label="Delete this recording"
-            onClick={() => onConfirm(r.path)}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        )}
+      {watching && <RecordingViewer recording={r} />}
+    </div>
+  )
+}
+
+// A small player for one recording, opened under its row. Starts where it was left off; "Start
+// over" plays it from the beginning.
+function RecordingViewer({ recording }: { recording: ShowRecording }) {
+  // `attempt` changes on every play, so each one remounts the player and starts a fresh stream.
+  const [request, setRequest] = useState(() => ({ startAt: resumePosition(recording), attempt: 0 }))
+  const [playlistUrl, setPlaylistUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    startRecordingStream(recording.path)
+      .then((url) => {
+        if (!cancelled) setPlaylistUrl(url)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [recording.path, request])
+
+  function startOver() {
+    setPlaylistUrl(null)
+    setError(null)
+    setRequest((prev) => ({ startAt: 0, attempt: prev.attempt + 1 }))
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="aspect-video w-full max-w-2xl overflow-hidden rounded-md bg-black">
+        <LivePlayer
+          key={request.attempt}
+          playlistUrl={playlistUrl}
+          // Any non-empty label - an empty one means "nothing selected" to the player.
+          tuningLabel={recording.title ?? 'recording'}
+          tuneError={error}
+          startAt={request.startAt}
+          loadingMessage={request.startAt > 0 ? `Resuming at ${formatClock(request.startAt)}` : 'Starting playback'}
+          errorMessage="Couldn't play this recording"
+          className="h-full w-full"
+        />
       </div>
+      {request.startAt > 0 && (
+        <Button size="sm" variant="outline" onClick={startOver}>
+          <RotateCcw className="size-4" />
+          Start over
+        </Button>
+      )}
     </div>
   )
 }

@@ -18,6 +18,9 @@ public class RecordingsController(
     // The body of watch/stop/delete: which recording.
     public record WatchRequest(string Path);
 
+    // The body of an update: which recording, and what to change (null: leave as is).
+    public record UpdateRequest(string Path, bool? Watched, bool? Protected);
+
     /// <summary>
     /// One item per card: a series or program with all its recorded episodes/airings, or a
     /// single recorded movie or sports event.
@@ -189,22 +192,28 @@ public class RecordingsController(
                     recordings = g
                         .OrderBy(r => r.Episode?.Number is > 0 ? r.Episode.Number : int.MaxValue)
                         .ThenBy(r => r.AiringDetails.Datetime)
-                        .Select(r => new
-                        {
-                            path = r.Path,
-                            recordedAt = r.AiringDetails.Datetime,
-                            channel = UpcomingResponses.Channel(r.AiringDetails.Channel),
-                            state = r.VideoDetails?.State,
-                            duration = r.VideoDetails?.Duration ?? 0,
-                            size = r.VideoDetails?.Size ?? 0,
-                            watched = r.UserInfo?.Watched ?? false,
-                            episodeNumber = r.Episode?.Number is > 0 ? r.Episode.Number : (int?)null,
-                            title = string.IsNullOrWhiteSpace(r.Episode?.Title) ? null : r.Episode.Title,
-                            description = string.IsNullOrWhiteSpace(r.Episode?.Description) ? null : r.Episode.Description,
-                        }),
+                        .Select(ShowRecording),
                 }),
         });
     }
+
+    // One recorded episode (or program airing) as the TV show dialog lists it.
+    private static object ShowRecording(RecordedAiring r) => new
+    {
+        path = r.Path,
+        recordedAt = r.AiringDetails.Datetime,
+        channel = UpcomingResponses.Channel(r.AiringDetails.Channel),
+        state = r.VideoDetails?.State,
+        duration = r.VideoDetails?.Duration ?? 0,
+        size = r.VideoDetails?.Size ?? 0,
+        watched = r.UserInfo?.Watched ?? false,
+        @protected = r.UserInfo?.Protected ?? false,
+        // Where playback last left off, in seconds.
+        position = r.UserInfo?.Position ?? 0,
+        episodeNumber = r.Episode?.Number is > 0 ? r.Episode.Number : (int?)null,
+        title = string.IsNullOrWhiteSpace(r.Episode?.Title) ? null : r.Episode.Title,
+        description = string.IsNullOrWhiteSpace(r.Episode?.Description) ? null : r.Episode.Description,
+    };
 
     // One recording as the player dialog lists it.
     private static object PlayerRecording(RecordedAiring r) => new
@@ -322,6 +331,50 @@ public class RecordingsController(
         }
 
         return Ok(new { path = recording.Path, state = recording.VideoDetails?.State });
+    }
+
+    /// <summary>
+    /// Marks a recording watched/unwatched and/or protected/unprotected (protected recordings
+    /// aren't deleted automatically by the series' keep rule). Fields left out stay as they are.
+    /// </summary>
+    /// <returns>The recording as the TV show dialog lists it, updated.</returns>
+    [HttpPatch]
+    public async Task<IActionResult> Update([FromBody] UpdateRequest request)
+    {
+        if (!recordings.Recordings.ContainsKey(request.Path))
+        {
+            return NotFound();
+        }
+        if (request.Watched is null && request.Protected is null)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "Nothing to change.");
+        }
+
+        var client = await deviceResolver.ResolveAsync();
+        if (client is null)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+
+        ApiResponse<RecordedAiring> response;
+        try
+        {
+            response = await client.UpdateRecordingAsync(
+                request.Path.TrimStart('/'),
+                new RecordingUpdate(request.Watched, request.Protected));
+        }
+        catch (HttpRequestException)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway);
+        }
+
+        if (!response.IsSuccessStatusCode || response.Content is null)
+        {
+            return response.ToErrorResult();
+        }
+
+        recordings.Upsert(response.Content);
+        return Ok(ShowRecording(response.Content));
     }
 
     /// <summary>
