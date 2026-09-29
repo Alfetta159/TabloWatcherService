@@ -63,6 +63,19 @@ build`/`dotnet run` does **not** trigger this — during backend-only work the S
 until you publish or build it yourself. Result is a single self-contained deployable:
 `dotnet TabloWatcherService.Api.dll` serves both API and SPA on one port.
 
+### Linux packages
+
+`packaging/build-packages.sh <semver> [amd64|arm64...]` does a self-contained, single-file
+publish per architecture and packages it as `.deb` + `.rpm` with nFPM
+(`packaging/nfpm.yaml`; unit file, `.desktop` launcher and install/remove scripts in
+`packaging/linux/`). The packaged service runs the native apphost on port 8080 — the same port
+as `deploy/tablowatcherservice.service`, which instead runs the framework-dependent
+`dotnet …dll`. Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the
+packages and creates a GitHub release (a pre-release if the tag has a `-` suffix). The
+install/remove scripts get different arguments from deb and rpm (`configure`/`remove`/`purge`
+vs. `1`/`2`/`0`), and on an rpm upgrade the old package's preremove runs *after* the new
+package's postinstall, so keep both formats in mind when editing them.
+
 ## Architecture
 
 ### Two upstream Tablo APIs, one local proxy pattern

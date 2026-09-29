@@ -1,0 +1,55 @@
+# Builds the Linux packages and publishes them as a GitHub release when a version tag is
+# pushed, e.g.:
+#
+#   git tag v0.1.0-preview1 && git push origin v0.1.0-preview1
+#
+# A tag with a pre-release suffix (anything after a "-") becomes a GitHub pre-release.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  linux-packages:
+    runs-on: ubuntu-latest
+    env:
+      NFPM_VERSION: 2.47.0
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/tablowatcher-web/package-lock.json
+
+      - name: Install nFPM
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}"
+          archive="nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          curl -sSfLO "$base/$archive"
+          curl -sSfLO "$base/checksums.txt"
+          grep " ${archive}\$" checksums.txt | sha256sum -c -
+          tar xzf "$archive" nfpm
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Build packages
+        run: packaging/build-packages.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" packaging/dist/* \
+            --title "$GITHUB_REF_NAME" --generate-notes "${prerelease[@]}"

@@ -15,6 +15,13 @@
     <PackageReference Include="Refit.HttpClientFactory" Version="16.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Runtime state and dev caches the app writes next to itself (see BlockedTagsStore,
+         DevCache). Never publish this machine's copies - a package upgrade would overwrite the
+         installed state with them. -->
+    <Content Remove="blocked-tags.json;dev-guide-cache.json;dev-recordings-cache.json" />
+  </ItemGroup>
+
   <PropertyGroup>
     <SpaRoot>..\tablowatcher-web\</SpaRoot>
     <SpaProxyServerUrl>http://localhost:5173</SpaProxyServerUrl>

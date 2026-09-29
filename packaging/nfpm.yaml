@@ -1,0 +1,56 @@
+# nFPM config for the .deb and .rpm packages - see packaging/build-packages.sh, which sets
+# ARCH/VERSION and stages the self-contained publish output before running nfpm from this
+# directory (the relative `src` paths below are resolved against it).
+name: tablowatcherservice
+arch: ${ARCH}
+platform: linux
+# A semver pre-release such as 0.1.0-preview1 becomes 0.1.0~preview1 in both formats, which
+# deb and rpm sort before the final 0.1.0 - so upgrading from a preview to the release works.
+version: ${VERSION}
+version_schema: semver
+section: video
+priority: optional
+maintainer: Alfetta159
+description: Watch and configure recordings for legacy Tablo DVR devices
+homepage: https://github.com/Alfetta159/TabloWatcherService
+license: MIT
+
+contents:
+  # Self-contained publish: bundles the .NET runtime, so no dotnet is needed on the machine.
+  - src: ./staging/opt/tablowatcherservice
+    dst: /opt/tablowatcherservice
+    type: tree
+  - src: ./linux/tablowatcherservice.service
+    dst: /usr/lib/systemd/system/tablowatcherservice.service
+  - src: ./linux/tablowatcherservice.desktop
+    dst: /usr/share/applications/tablowatcherservice.desktop
+  - src: ../src/tablowatcher-web/public/apple-touch-icon.png
+    dst: /usr/share/pixmaps/tablowatcherservice.png
+
+scripts:
+  postinstall: ./linux/postinstall.sh
+  preremove: ./linux/preremove.sh
+  postremove: ./linux/postremove.sh
+
+# The bundled runtime still loads ICU (globalization) and OpenSSL (HTTPS to the Tablo
+# association server) from the system. Package names vary across distro releases, so they're
+# recommended rather than required: nearly every desktop install already has them, and an
+# unmatched name shouldn't block installing on a newer release.
+overrides:
+  deb:
+    depends:
+      - libc6
+      - libgcc-s1
+      - libstdc++6
+    recommends:
+      - libssl3t64 | libssl3
+      - libicu78 | libicu77 | libicu76 | libicu75 | libicu74 | libicu72 | libicu70
+      - xdg-utils
+  rpm:
+    depends:
+      - glibc
+      - libstdc++
+    recommends:
+      - libicu
+      - openssl-libs
+      - xdg-utils
