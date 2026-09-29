@@ -1,0 +1,61 @@
+# Uploads a GitHub release's .deb and .rpm packages to the Cloudsmith apt/dnf repository,
+# so users can `apt install tablowatcherservice` and get updates with their system updates.
+#
+# release.yml calls this after creating each release. To upload a release that was built
+# before Cloudsmith was set up, run it by hand: Actions > Publish to Cloudsmith > Run workflow.
+#
+# Needs, under Settings > Secrets and variables > Actions:
+#   variable CLOUDSMITH_REPO     workspace/repository, e.g. alfetta159/tablowatcherservice
+#   secret   CLOUDSMITH_API_KEY  from Cloudsmith > your avatar > Personal API Keys
+name: Publish to Cloudsmith
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to upload, e.g. v0.1.0-preview1
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+      CLOUDSMITH_REPO: ${{ vars.CLOUDSMITH_REPO }}
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Check configuration
+        run: |
+          if [[ -z "$CLOUDSMITH_REPO" || -z "$CLOUDSMITH_API_KEY" ]]; then
+            echo "::error::Set the CLOUDSMITH_REPO variable and CLOUDSMITH_API_KEY secret (see the top of cloudsmith.yml)."
+            exit 1
+          fi
+
+      - name: Install Cloudsmith CLI
+        run: pipx install cloudsmith-cli
+
+      - name: Download release packages
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.deb' --pattern '*.rpm' --dir packages
+
+      # any-distro/any-version: one upload serves every Debian/Ubuntu (or Fedora/openSUSE)
+      # release - the packages are self-contained, so nothing about them is distro-specific.
+      - name: Upload to Cloudsmith
+        run: |
+          for file in packages/*.deb; do
+            cloudsmith push deb "$CLOUDSMITH_REPO/any-distro/any-version" "$file"
+          done
+          for file in packages/*.rpm; do
+            cloudsmith push rpm "$CLOUDSMITH_REPO/any-distro/any-version" "$file"
+          done

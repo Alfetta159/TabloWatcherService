@@ -53,3 +53,12 @@ jobs:
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
           gh release create "$GITHUB_REF_NAME" packaging/dist/* \
             --title "$GITHUB_REF_NAME" --generate-notes "${prerelease[@]}"
+
+  cloudsmith:
+    needs: linux-packages
+    # Skipped until the Cloudsmith repository is configured - see cloudsmith.yml.
+    if: vars.CLOUDSMITH_REPO != ''
+    uses: ./.github/workflows/cloudsmith.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
