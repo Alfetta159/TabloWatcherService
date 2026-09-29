@@ -47,11 +47,37 @@ Search allows you to search by title, actor, director or any keyword that might 
 
 ## Installing on Linux
 
+The packages bundle the .NET runtime, so there's nothing else to install first. They work
+on Debian, Ubuntu, Mint and Raspberry Pi OS (`apt`) and on Fedora and openSUSE (`dnf`/`zypper`),
+on a typical PC or a 64-bit Raspberry Pi.
+
+### From the package repository (recommended)
+
+Add the repository once, then install. After that, updates arrive with your normal system
+updates (`sudo apt upgrade` / `sudo dnf upgrade`).
+
+Debian, Ubuntu, Mint, Raspberry Pi OS:
+
+```bash
+curl -sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/cfg/setup/bash.deb.sh' | sudo bash
+sudo apt install tablowatcherservice
+```
+
+Fedora, openSUSE:
+
+```bash
+curl -sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/cfg/setup/bash.rpm.sh' | sudo bash
+sudo dnf install tablowatcherservice
+```
+
+Package repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
+
+### From a downloaded package
+
 Download the package for your system from the
-[Releases](https://github.com/Alfetta159/TabloWatcherService/releases) page: `.deb` for
-Debian, Ubuntu, Mint and Raspberry Pi OS; `.rpm` for Fedora and openSUSE. Pick `amd64` /
-`x86_64` for a typical PC, or `arm64` / `aarch64` for a 64-bit Raspberry Pi. The packages
-bundle the .NET runtime, so there's nothing else to install first.
+[Releases](https://github.com/Alfetta159/TabloWatcherService/releases) page: `.deb` or
+`.rpm`, and `amd64` / `x86_64` for a typical PC or `arm64` / `aarch64` for a 64-bit
+Raspberry Pi. Installing this way doesn't give you automatic updates.
 
 ```bash
 sudo apt install ./tablowatcherservice_<version>_amd64.deb
@@ -60,6 +86,8 @@ sudo apt install ./tablowatcherservice_<version>_amd64.deb
 ```bash
 sudo dnf install ./tablowatcherservice-<version>-1.x86_64.rpm
 ```
+
+### After installing
 
 This installs the app to `/opt/tablowatcherservice` and starts it as the
 `tablowatcherservice` service (see [Linux (systemd)](#linux-systemd) for checking on it),
@@ -204,8 +232,9 @@ Packages and a `SHA256SUMS` file land in `packaging/dist/`. The package definiti
 install/remove scripts in [packaging/linux](packaging/linux).
 
 To publish a release, push a version tag. The [Release workflow](.github/workflows/release.yml)
-builds the packages and attaches them to a GitHub release. A tag with a `-` suffix (like
-`v0.1.0-preview1`) becomes a pre-release:
+builds the packages, attaches them to a GitHub release, and then (via
+[cloudsmith.yml](.github/workflows/cloudsmith.yml)) uploads them to the Cloudsmith package
+repository. A tag with a `-` suffix (like `v0.1.0-preview1`) becomes a pre-release:
 
 ```bash
 git tag v0.1.0-preview1
