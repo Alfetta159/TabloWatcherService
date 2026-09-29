@@ -97,24 +97,64 @@ public class RecordingsController(
             thumbnailImageId = movie?.ThumbnailImage?.ImageId,
             coverImageId = movie?.CoverImage?.ImageId,
             backgroundImageId = movie?.BackgroundImage?.ImageId,
-            recordings = group.Recordings.Select(r => new
-            {
-                path = r.Path,
-                recordedAt = r.AiringDetails.Datetime,
-                channel = UpcomingResponses.Channel(r.AiringDetails.Channel),
-                state = r.VideoDetails?.State,
-                // Seconds actually recorded.
-                duration = r.VideoDetails?.Duration ?? 0,
-                size = r.VideoDetails?.Size ?? 0,
-                width = r.VideoDetails?.Width ?? 0,
-                height = r.VideoDetails?.Height ?? 0,
-                watched = r.UserInfo?.Watched ?? false,
-                // Where playback last left off, in seconds.
-                position = r.UserInfo?.Position ?? 0,
-                snapshotImageId = r.SnapshotImage?.ImageId,
-            }),
+            recordings = group.Recordings.Select(PlayerRecording),
         });
     }
+
+    /// <summary>
+    /// A recorded sports event's details and its recording - for the Recordings page's player
+    /// dialog, in the same shape as <see cref="GetMovie"/>. Each event is its own group, so
+    /// there's only ever the one recording.
+    /// </summary>
+    [HttpGet("sports/{eventId:int}")]
+    public IActionResult GetSportsEvent(int eventId)
+    {
+        // Matched on the ID alone, not the whole path (presumably /recordings/sports/events/N,
+        // but not yet seen on a real device).
+        var group = recordings.GetGroups()
+            .FirstOrDefault(g => g.Kind == RecordingKinds.Sport && g.Key.EndsWith($"/{eventId}", StringComparison.Ordinal));
+        if (group is null)
+        {
+            return NotFound();
+        }
+
+        var sport = group.Sport;
+        var latest = group.Recordings[0];
+        var sportsEvent = latest.Event;
+        return Ok(new
+        {
+            path = group.Key,
+            title = group.Title,
+            // The sport or competition ("College Football"), which the title is the game of.
+            sport = sport?.Title ?? latest.AiringDetails.ShowTitle,
+            description = sportsEvent?.Description ?? sport?.Description,
+            venue = sportsEvent?.Venue,
+            teams = (sportsEvent?.Teams ?? []).Select(t => new { name = t.Name, isHome = t.TeamId == sportsEvent?.HomeTeamId }),
+            genres = sport?.Genres ?? [],
+            thumbnailImageId = sport?.ThumbnailImage?.ImageId,
+            coverImageId = sport?.CoverImage?.ImageId,
+            backgroundImageId = sport?.BackgroundImage?.ImageId,
+            recordings = group.Recordings.Select(PlayerRecording),
+        });
+    }
+
+    // One recording as the player dialog lists it.
+    private static object PlayerRecording(RecordedAiring r) => new
+    {
+        path = r.Path,
+        recordedAt = r.AiringDetails.Datetime,
+        channel = UpcomingResponses.Channel(r.AiringDetails.Channel),
+        state = r.VideoDetails?.State,
+        // Seconds actually recorded.
+        duration = r.VideoDetails?.Duration ?? 0,
+        size = r.VideoDetails?.Size ?? 0,
+        width = r.VideoDetails?.Width ?? 0,
+        height = r.VideoDetails?.Height ?? 0,
+        watched = r.UserInfo?.Watched ?? false,
+        // Where playback last left off, in seconds.
+        position = r.UserInfo?.Position ?? 0,
+        snapshotImageId = r.SnapshotImage?.ImageId,
+    };
 
     /// <summary>
     /// Starts playback of one recording. The browser plays the returned playlistUrl straight
