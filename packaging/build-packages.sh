@@ -61,6 +61,16 @@ for arch in "${ARCHES[@]}"; do
 done
 
 rm -rf "$STAGING_DIR"
+
+# nfpm names pre-release files with the package version's "~" (…_0.1.0~preview1_amd64.deb),
+# which GitHub rewrites to "." in release downloads - breaking SHA256SUMS. Use the semver "-"
+# in file names instead; the version recorded inside each package keeps its "~".
+for file in "$OUTPUT_DIR"/*; do
+    if [[ "$file" == *"~"* ]]; then
+        mv -- "$file" "${file//\~/-}"
+    fi
+done
+
 (cd "$OUTPUT_DIR" && sha256sum -- *.deb *.rpm > SHA256SUMS)
 
 echo "==> Built:"
