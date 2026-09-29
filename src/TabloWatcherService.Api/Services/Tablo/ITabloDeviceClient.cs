@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using TabloWatcherService.Api.Models;
 
 namespace TabloWatcherService.Api.Services.Tablo;
@@ -92,6 +93,12 @@ public interface ITabloDeviceClient
     [Delete("/{**recordingPath}")]
     Task<IApiResponse> DeleteRecordingAsync(string recordingPath);
 
+    // Marks a recording watched/unwatched or protected/unprotected by PATCHing its own path
+    // (e.g. "recordings/series/episodes/123", no leading slash) with just the fields to change.
+    // The device answers with the whole recording, updated.
+    [Patch("/{**recordingPath}")]
+    Task<ApiResponse<RecordedAiring>> UpdateRecordingAsync(string recordingPath, [Body] RecordingUpdate update);
+
     // Schedules (true) or cancels (false) a recording of one airing - a series episode, movie
     // airing or sports event - by PATCHing the airing's own path (e.g.
     // "guide/movies/airings/123", no leading slash: "**" keeps its slashes unescaped). The
@@ -109,3 +116,9 @@ public interface ITabloDeviceClient
 
 // Body for ITabloDeviceClient.SetAiringScheduledAsync - serialized as {"scheduled": true}.
 public record ScheduleRequest(bool Scheduled);
+
+// Body for ITabloDeviceClient.UpdateRecordingAsync - only the fields being changed are sent,
+// e.g. {"watched": true}; the device leaves the others as they are.
+public record RecordingUpdate(
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Watched,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Protected);

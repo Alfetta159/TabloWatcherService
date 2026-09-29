@@ -56,6 +56,39 @@ export function recordingStateOf(schedule: AiringSchedule | null): RecordingStat
   return isConflict(schedule) ? 'conflict' : isScheduled(schedule) ? 'scheduled' : null
 }
 
+// Where to pick up a recording: where it was left off, unless it was finished (or barely started).
+export function resumePosition(recording: { watched: boolean; position: number }): number {
+  return !recording.watched && recording.position > 30 ? recording.position : 0
+}
+
+// Starts a fresh stream of one recording and returns its playlist URL, which the browser plays
+// straight from the device. Each play needs its own - the device's session token is short-lived.
+export async function startRecordingStream(path: string): Promise<string> {
+  const res = await fetch('/api/recordings/watch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  })
+  if (!res.ok) throw new Error(res.status === 502 ? "the Tablo didn't respond - try again" : `API returned ${res.status}`)
+  const { playlistUrl } = (await res.json()) as { playlistUrl: string }
+  return playlistUrl
+}
+
+// Marks one recording watched/unwatched and/or protected/unprotected; fields left out stay as
+// they are. Resolves to the recording as the API now reports it.
+export async function updateRecording<T>(path: string, change: { watched?: boolean; protected?: boolean }): Promise<T> {
+  const res = await fetch('/api/recordings', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, ...change }),
+  })
+  if (!res.ok) {
+    const problem = (await res.json().catch(() => null)) as { detail?: string } | null
+    throw new Error(problem?.detail ?? (res.status === 502 ? "The Tablo didn't respond - try again" : `API returned ${res.status}`))
+  }
+  return res.json() as Promise<T>
+}
+
 // Stops (keeping what's recorded so far) or deletes one recording.
 export async function postRecordingAction(action: 'stop' | 'delete', path: string): Promise<void> {
   const res = await fetch(`/api/recordings/${action}`, {
