@@ -71,10 +71,7 @@ publish per architecture and packages it as `.deb` + `.rpm` with nFPM
 `packaging/linux/`). The packaged service runs the native apphost on port 8080 — the same port
 as `deploy/tablowatcherservice.service`, which instead runs the framework-dependent
 `dotnet …dll`. Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the
-packages and creates a GitHub release (a pre-release if the tag has a `-` suffix), then
-calls `.github/workflows/cloudsmith.yml` to upload them to the Cloudsmith apt/dnf repo
-(skipped unless the `CLOUDSMITH_REPO` repo variable is set; also runnable by hand for an
-existing tag). The
+packages and creates a GitHub release (a pre-release if the tag has a `-` suffix). The
 install/remove scripts get different arguments from deb and rpm (`configure`/`remove`/`purge`
 vs. `1`/`2`/`0`), and on an rpm upgrade the old package's preremove runs *after* the new
 package's postinstall, so keep both formats in mind when editing them.
