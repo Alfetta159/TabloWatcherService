@@ -59,14 +59,14 @@ updates (`sudo apt upgrade` / `sudo dnf upgrade`).
 Debian, Ubuntu, Mint, Raspberry Pi OS:
 
 ```bash
-curl -sLf 'https://dl.cloudsmith.io/public/alfetta159/tablowatcherservice/cfg/setup/bash.deb.sh' | sudo bash
+curl -sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/cfg/setup/bash.deb.sh' | sudo bash
 sudo apt install tablowatcherservice
 ```
 
 Fedora, openSUSE:
 
 ```bash
-curl -sLf 'https://dl.cloudsmith.io/public/alfetta159/tablowatcherservice/cfg/setup/bash.rpm.sh' | sudo bash
+curl -sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/cfg/setup/bash.rpm.sh' | sudo bash
 sudo dnf install tablowatcherservice
 ```
 

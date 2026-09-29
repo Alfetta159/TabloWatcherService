@@ -5,7 +5,7 @@
 # before Cloudsmith was set up, run it by hand: Actions > Publish to Cloudsmith > Run workflow.
 #
 # Needs, under Settings > Secrets and variables > Actions:
-#   variable CLOUDSMITH_REPO     workspace/repository, e.g. alfetta159/tablowatcherservice
+#   variable CLOUDSMITH_REPO     workspace/repository, e.g. alfetta159/tablo-watcher-service
 #   secret   CLOUDSMITH_API_KEY  from Cloudsmith > your avatar > Personal API Keys
 name: Publish to Cloudsmith
 
