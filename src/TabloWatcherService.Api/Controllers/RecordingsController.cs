@@ -138,6 +138,74 @@ public class RecordingsController(
         });
     }
 
+    /// <summary>
+    /// A recorded series' details and every recorded episode, by season - for the Recordings
+    /// page's TV show dialog.
+    /// </summary>
+    [HttpGet("series/{seriesId:int}")]
+    public IActionResult GetSeries(int seriesId) => Show($"/recordings/series/{seriesId}");
+
+    /// <summary>
+    /// A recorded program (e.g. a local newscast) and every recorded airing of it, in the same
+    /// shape as <see cref="GetSeries"/>. Programs have no seasons, so it's all one.
+    /// </summary>
+    [HttpGet("programs/{programId:int}")]
+    public IActionResult GetProgram(int programId) => Show($"/recordings/programs/{programId}");
+
+    private IActionResult Show(string path)
+    {
+        var group = recordings.GetGroups().FirstOrDefault(g => g.Key == path);
+        if (group is null)
+        {
+            return NotFound();
+        }
+
+        var series = group.Series;
+        var latest = group.Recordings[0];
+        return Ok(new
+        {
+            path,
+            kind = group.Kind,
+            title = group.Title,
+            description = string.IsNullOrWhiteSpace(series?.Description) ? null : series.Description,
+            genres = series?.Genres ?? [],
+            seriesRating = string.IsNullOrWhiteSpace(series?.SeriesRating) ? null : series.SeriesRating,
+            origAirDate = series?.OrigAirDate,
+            episodeRuntime = series?.EpisodeRuntime is > 0 ? series.EpisodeRuntime : (int?)null,
+            cast = series?.Cast ?? [],
+            thumbnailImageId = series?.ThumbnailImage?.ImageId,
+            coverImageId = series?.CoverImage?.ImageId,
+            backgroundImageId = series?.BackgroundImage?.ImageId,
+            // A frame from the newest recording - the only art a program has.
+            snapshotImageId = latest.SnapshotImage?.ImageId,
+            // By season, lowest first; episodes without a season number last. Within a season,
+            // by episode number, then oldest recording first.
+            seasons = group.Recordings
+                .GroupBy(r => r.Episode?.SeasonNumber ?? 0)
+                .OrderBy(g => g.Key == 0 ? int.MaxValue : g.Key)
+                .Select(g => new
+                {
+                    number = g.Key == 0 ? (int?)null : g.Key,
+                    recordings = g
+                        .OrderBy(r => r.Episode?.Number is > 0 ? r.Episode.Number : int.MaxValue)
+                        .ThenBy(r => r.AiringDetails.Datetime)
+                        .Select(r => new
+                        {
+                            path = r.Path,
+                            recordedAt = r.AiringDetails.Datetime,
+                            channel = UpcomingResponses.Channel(r.AiringDetails.Channel),
+                            state = r.VideoDetails?.State,
+                            duration = r.VideoDetails?.Duration ?? 0,
+                            size = r.VideoDetails?.Size ?? 0,
+                            watched = r.UserInfo?.Watched ?? false,
+                            episodeNumber = r.Episode?.Number is > 0 ? r.Episode.Number : (int?)null,
+                            title = string.IsNullOrWhiteSpace(r.Episode?.Title) ? null : r.Episode.Title,
+                            description = string.IsNullOrWhiteSpace(r.Episode?.Description) ? null : r.Episode.Description,
+                        }),
+                }),
+        });
+    }
+
     // One recording as the player dialog lists it.
     private static object PlayerRecording(RecordedAiring r) => new
     {

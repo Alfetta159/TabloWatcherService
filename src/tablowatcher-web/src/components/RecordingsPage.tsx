@@ -7,6 +7,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RecordingPill } from '@/components/Recording'
+import { RecordedShowDialog } from '@/components/RecordedShowDialog'
 import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog'
 import type { ChannelInfo } from '@/components/PosterGridPage'
 import { compareTitles, formatSize } from '@/lib/format'
@@ -248,6 +249,9 @@ export function RecordingsPage() {
   // The recorded movie or sports event open in the player dialog.
   const [playing, setPlaying] = useState<{ kind: 'movie' | 'sport'; path: string } | null>(null)
   const closePlayer = useCallback(() => setPlaying(null), [])
+  // The recorded TV show or program open in its recordings dialog.
+  const [openShow, setOpenShow] = useState<{ kind: 'tv' | 'program'; path: string } | null>(null)
+  const closeShow = useCallback(() => setOpenShow(null), [])
   const recorded = usePolledList<RecordingGroup>('/api/recordings')
   const scheduled = usePolledList<ScheduledItem>('/api/recordings/scheduled')
 
@@ -356,7 +360,7 @@ export function RecordingsPage() {
                 onOpen={
                   group.kind === 'movie' || group.kind === 'sport'
                     ? () => setPlaying({ kind: group.kind as 'movie' | 'sport', path: group.key })
-                    : undefined
+                    : () => setOpenShow({ kind: group.kind as 'tv' | 'program', path: group.key })
                 }
               />
             ))}
@@ -370,6 +374,18 @@ export function RecordingsPage() {
             path={playing.path}
             onChanged={recorded.reload}
             onEmpty={closePlayer}
+          />
+        )}
+      </Dialog>
+
+      <Dialog open={openShow !== null} onOpenChange={(open) => !open && setOpenShow(null)}>
+        {openShow !== null && (
+          <RecordedShowDialog
+            key={openShow.path}
+            kind={openShow.kind}
+            path={openShow.path}
+            onChanged={recorded.reload}
+            onEmpty={closeShow}
           />
         )}
       </Dialog>
