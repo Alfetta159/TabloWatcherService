@@ -245,9 +245,9 @@ function recordedLines(group: RecordingGroup): string[] {
 export function RecordingsPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [sortOrder, setSortOrder] = useState<SortOrder>('date')
-  // The recorded movie open in the player dialog, by its /recordings/movies/... path.
-  const [playingMoviePath, setPlayingMoviePath] = useState<string | null>(null)
-  const closePlayer = useCallback(() => setPlayingMoviePath(null), [])
+  // The recorded movie or sports event open in the player dialog.
+  const [playing, setPlaying] = useState<{ kind: 'movie' | 'sport'; path: string } | null>(null)
+  const closePlayer = useCallback(() => setPlaying(null), [])
   const recorded = usePolledList<RecordingGroup>('/api/recordings')
   const scheduled = usePolledList<ScheduledItem>('/api/recordings/scheduled')
 
@@ -353,16 +353,21 @@ export function RecordingsPage() {
                 pill={group.inProgress && <RecordingNowPill />}
                 lines={recordedLines(group)}
                 genres={group.genres}
-                onOpen={group.kind === 'movie' ? () => setPlayingMoviePath(group.key) : undefined}
+                onOpen={
+                  group.kind === 'movie' || group.kind === 'sport'
+                    ? () => setPlaying({ kind: group.kind as 'movie' | 'sport', path: group.key })
+                    : undefined
+                }
               />
             ))}
       </div>
 
-      <Dialog open={playingMoviePath !== null} onOpenChange={(open) => !open && setPlayingMoviePath(null)}>
-        {playingMoviePath !== null && (
+      <Dialog open={playing !== null} onOpenChange={(open) => !open && setPlaying(null)}>
+        {playing !== null && (
           <RecordingPlayerDialog
-            key={playingMoviePath}
-            moviePath={playingMoviePath}
+            key={playing.path}
+            kind={playing.kind}
+            path={playing.path}
             onChanged={recorded.reload}
             onEmpty={closePlayer}
           />

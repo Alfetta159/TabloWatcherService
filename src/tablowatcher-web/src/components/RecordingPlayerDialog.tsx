@@ -8,12 +8,21 @@ import type { ChannelInfo } from '@/components/PosterGridPage'
 import { postRecordingAction } from '@/lib/recording'
 import { formatClock, formatDuration, formatRating, formatSize, formatStars } from '@/lib/format'
 
-// GET /api/recordings/movies/{id}.
-interface RecordedMovie {
+// GET /api/recordings/movies/{id} or /api/recordings/sports/{id}: the shared fields,
+// plus the movie's or the sports event's own.
+interface RecordedItem {
   path: string
   title: string
   description: string | null
   genres: string[]
+  thumbnailImageId: number | null
+  coverImageId: number | null
+  backgroundImageId: number | null
+  // Newest first.
+  recordings: Recording[]
+}
+
+interface RecordedMovie extends RecordedItem {
   releaseYear: number | null
   filmRating: string | null
   starRating: number | null
@@ -21,14 +30,18 @@ interface RecordedMovie {
   runtime: number | null
   cast: string[]
   directors: string[]
-  thumbnailImageId: number | null
-  coverImageId: number | null
-  backgroundImageId: number | null
-  // Newest first.
-  recordings: MovieRecording[]
 }
 
-interface MovieRecording {
+interface RecordedSportsEvent extends RecordedItem {
+  // The sport or competition the title is the game of ("College Football").
+  sport: string
+  venue: string | null
+  teams: { name: string; isHome: boolean }[]
+}
+
+type RecordedDetail = RecordedMovie | RecordedSportsEvent
+
+interface Recording {
   path: string
   recordedAt: string
   channel: ChannelInfo
@@ -53,7 +66,7 @@ interface PlayRequest {
 }
 
 // Where to pick up a recording: where it was left off, unless it was finished (or barely started).
-function resumePosition(recording: MovieRecording): number {
+function resumePosition(recording: Recording): number {
   return !recording.watched && recording.position > 30 ? recording.position : 0
 }
 
@@ -70,35 +83,37 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-// A recorded movie in a large dialog, split 1:3 - its details and recordings on the left,
-// playing on the right. Playback starts on open, resuming where it was left off.
-// `onChanged` tells the page to re-read its list after a recording is stopped or deleted;
-// `onEmpty` closes the dialog once the movie has no recordings left.
+// A recorded movie or sports event in a large dialog, split 1:3 - its details and recordings
+// on the left, playing on the right. Playback starts on open, resuming where it was left off.
+// `path` is its /recordings/movies/... or /recordings/sports/... path. `onChanged` tells the
+// page to re-read its list after a recording is stopped or deleted; `onEmpty` closes the
+// dialog once there are no recordings of it left.
 export function RecordingPlayerDialog({
-  moviePath,
+  kind,
+  path,
   onChanged,
   onEmpty,
 }: {
-  moviePath: string
+  kind: 'movie' | 'sport'
+  path: string
   onChanged: () => void
   onEmpty: () => void
 }) {
-  const [movie, setMovie] = useState<RecordedMovie | null>(null)
+  const [item, setItem] = useState<RecordedDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [playRequest, setPlayRequest] = useState<PlayRequest | null>(null)
   const [playlistUrl, setPlaylistUrl] = useState<string | null>(null)
   const [watchError, setWatchError] = useState<string | null>(null)
   const [posterFailed, setPosterFailed] = useState(false)
-  // Bumped to re-read the movie after a stop or delete.
+  // Bumped to re-read the item after a stop or delete.
   const [reloadToken, setReloadToken] = useState(0)
   const [actionBusy, setActionBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   // Deleting can't be undone, so it takes a second click.
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const movieId = moviePath.split('/').pop()
 
   // Clears the last stream here rather than in the effect that fetches the next one.
-  function playFrom(recording: MovieRecording, startAt: number) {
+  function playFrom(recording: Recording, startAt: number) {
     setPlaylistUrl(null)
     setWatchError(null)
     setPlayRequest((prev) => ({ path: recording.path, startAt, attempt: (prev?.attempt ?? 0) + 1 }))
@@ -106,14 +121,14 @@ export function RecordingPlayerDialog({
 
   useEffect(() => {
     let cancelled = false
-    fetch(`/api/recordings/movies/${movieId}`)
+    fetch(`/api/recordings/${kind === 'movie' ? 'movies' : 'sports'}/${path.split('/').pop()}`)
       .then((res) => {
         if (!res.ok) throw new Error(`API returned ${res.status}`)
-        return res.json() as Promise<RecordedMovie>
+        return res.json() as Promise<RecordedDetail>
       })
       .then((m) => {
         if (cancelled) return
-        setMovie(m)
+        setItem(m)
         // Keep playing what's playing, unless it's gone (deleted) or nothing has started yet.
         setPlayRequest((current) => {
           if (current && m.recordings.some((r) => r.path === current.path)) return current
@@ -126,16 +141,16 @@ export function RecordingPlayerDialog({
       })
       .catch((err) => {
         if (cancelled) return
-        // Its last recording was deleted, so the movie has dropped out of the recordings.
+        // Its last recording was deleted, so it has dropped out of the recordings.
         if (reloadToken > 0 && err.message === 'API returned 404') onEmpty()
         else setLoadError(err.message)
       })
     return () => {
       cancelled = true
     }
-  }, [movieId, reloadToken, onEmpty])
+  }, [kind, path, reloadToken, onEmpty])
 
-  function runAction(action: 'stop' | 'delete', recording: MovieRecording) {
+  function runAction(action: 'stop' | 'delete', recording: Recording) {
     setActionBusy(true)
     setActionError(null)
     postRecordingAction(action, recording.path)
@@ -173,24 +188,35 @@ export function RecordingPlayerDialog({
   }, [playRequest])
 
 
-  const playing = movie?.recordings.find((r) => r.path === playRequest?.path) ?? null
-  const posterId = posterFailed ? null : (movie?.thumbnailImageId ?? movie?.coverImageId ?? playing?.snapshotImageId ?? null)
-  const meta = movie
-    ? [
-        movie.releaseYear,
-        formatRating(movie.filmRating),
-        movie.starRating && formatStars(movie.starRating),
-        movie.runtime && formatDuration(movie.runtime),
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : ''
+  const playing = item?.recordings.find((r) => r.path === playRequest?.path) ?? null
+  const posterId = posterFailed ? null : (item?.thumbnailImageId ?? item?.coverImageId ?? playing?.snapshotImageId ?? null)
+  const movie = item && !('sport' in item) ? item : null
+  const sportsEvent = item && 'sport' in item ? item : null
+  const meta = (
+    movie
+      ? [
+          movie.releaseYear,
+          formatRating(movie.filmRating),
+          movie.starRating && formatStars(movie.starRating),
+          movie.runtime && formatDuration(movie.runtime),
+        ]
+      : sportsEvent
+        ? [sportsEvent.title === sportsEvent.sport ? null : sportsEvent.sport, sportsEvent.venue]
+        : []
+  )
+    .filter(Boolean)
+    .join(' · ')
+  // "Northwestern at Indiana" is already the title; list the teams only when it isn't.
+  const teams =
+    sportsEvent && !sportsEvent.teams.every((t) => sportsEvent.title.includes(t.name)) ? sportsEvent.teams : []
 
   return (
-    <DialogContent className="grid h-[88vh] w-[96vw] max-w-none grid-cols-4 gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,1800px)]">
+    // The one row is pinned to the dialog's height, so the player fills it rather than
+    // growing the row to the video's own height on a wide window.
+    <DialogContent className="grid h-[88vh] w-[96vw] max-w-none grid-cols-4 grid-rows-[minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,1800px)]">
       {/* Preview: 1 of 4 columns. */}
       <div className="col-span-1 min-w-0 space-y-5 overflow-y-auto border-r p-5">
-        {!movie ? (
+        {!item ? (
           <>
             <DialogTitle>{loadError ? "Couldn't load this recording" : 'Loading…'}</DialogTitle>
             {loadError ? (
@@ -210,19 +236,24 @@ export function RecordingPlayerDialog({
               />
             )}
             <div className="space-y-1">
-              <DialogTitle className="text-xl leading-tight font-semibold">{movie.title}</DialogTitle>
+              <DialogTitle className="text-xl leading-tight font-semibold">{item.title}</DialogTitle>
               <DialogDescription className="text-muted-foreground text-sm">{meta}</DialogDescription>
             </div>
-            {movie.genres.length > 0 && (
+            {item.genres.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {movie.genres.map((g) => (
+                {item.genres.map((g) => (
                   <Badge key={g} variant="secondary">
                     {g}
                   </Badge>
                 ))}
               </div>
             )}
-            {movie.description && <p className="text-sm leading-relaxed">{movie.description}</p>}
+            {item.description && <p className="text-sm leading-relaxed">{item.description}</p>}
+            {teams.length > 0 && (
+              <Section title="Teams">
+                <p className="text-sm">{teams.map((t) => (t.isHome ? `${t.name} (home)` : t.name)).join(' vs. ')}</p>
+              </Section>
+            )}
 
             {playing && (
               <div className="flex flex-wrap gap-2">
@@ -269,9 +300,9 @@ export function RecordingPlayerDialog({
               </div>
             )}
 
-            <Section title={movie.recordings.length === 1 ? 'Recording' : `Recordings (${movie.recordings.length})`}>
+            <Section title={item.recordings.length === 1 ? 'Recording' : `Recordings (${item.recordings.length})`}>
               <div className="space-y-2">
-                {movie.recordings.map((r) => {
+                {item.recordings.map((r) => {
                   const current = r.path === playRequest?.path
                   return (
                     <button
@@ -305,12 +336,12 @@ export function RecordingPlayerDialog({
               </div>
             </Section>
 
-            {movie.cast.length > 0 && (
+            {movie && movie.cast.length > 0 && (
               <Section title="Cast">
                 <p className="text-sm">{movie.cast.slice(0, 12).join(', ')}</p>
               </Section>
             )}
-            {movie.directors.length > 0 && (
+            {movie && movie.directors.length > 0 && (
               <Section title={movie.directors.length === 1 ? 'Director' : 'Directors'}>
                 <p className="text-sm">{movie.directors.join(', ')}</p>
               </Section>
@@ -327,7 +358,7 @@ export function RecordingPlayerDialog({
             key={`${playRequest.path}:${playRequest.attempt}`}
             playlistUrl={playlistUrl}
             // Any non-empty label - an empty one means "nothing selected" to the player.
-            tuningLabel={movie?.title ?? 'recording'}
+            tuningLabel={item?.title ?? 'recording'}
             tuneError={watchError}
             startAt={playRequest.startAt}
             loadingMessage={playRequest.startAt > 0 ? `Resuming at ${formatClock(playRequest.startAt)}` : 'Starting playback'}

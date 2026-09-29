@@ -147,8 +147,8 @@ export function LivePlayer({
         // eslint-disable-next-line jsx-a11y/media-has-caption
         <video
           ref={videoRef}
-          className="max-h-full max-w-full"
-          style={{ aspectRatio: '16 / 9' }}
+          // Fills the pane, letterboxed to the video's own aspect ratio.
+          className="h-full w-full object-contain"
           controls
           onPlaying={() => setPlaying(true)}
           onVolumeChange={(e) => saveAudioSettings(e.currentTarget)}
