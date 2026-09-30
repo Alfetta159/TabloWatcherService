@@ -5,7 +5,8 @@
 # root-owned files end up in the repo); only the system steps use sudo, which will ask
 # for your password.
 #
-#   deploy/install.sh
+#   deploy/install.sh               install, or update to your latest code
+#   deploy/install.sh --uninstall   stop the service and remove everything this installed
 #
 # Safe to re-run: the first run installs the service, later runs update it in place.
 set -euo pipefail
@@ -22,6 +23,51 @@ if [[ $EUID -eq 0 ]]; then
     echo "Run this as your normal user, not root/sudo - it calls sudo itself where needed." >&2
     exit 1
 fi
+
+uninstall() {
+    # A package install (GitHub Releases .deb/.rpm) owns the same paths; let its package
+    # manager remove it, so it doesn't think it's still installed.
+    if dpkg -s "$SERVICE_NAME" &>/dev/null || rpm -q "$SERVICE_NAME" &>/dev/null; then
+        echo "$SERVICE_NAME was installed as a package - remove it with" >&2
+        echo "'sudo apt remove $SERVICE_NAME' or 'sudo dnf remove $SERVICE_NAME' instead." >&2
+        exit 1
+    fi
+
+    if systemctl cat "$SERVICE_NAME" &>/dev/null; then
+        echo "==> Stopping and disabling service"
+        sudo systemctl disable --now "$SERVICE_NAME"
+    fi
+
+    if [[ -f "/etc/systemd/system/$SERVICE_NAME.service" ]]; then
+        echo "==> Removing systemd unit"
+        sudo rm "/etc/systemd/system/$SERVICE_NAME.service"
+        sudo systemctl daemon-reload
+    fi
+
+    if [[ -d "$INSTALL_DIR" ]]; then
+        echo "==> Removing $INSTALL_DIR"
+        sudo rm -rf "$INSTALL_DIR"
+    fi
+
+    if id "$SERVICE_USER" &>/dev/null; then
+        echo "==> Removing system user '$SERVICE_USER'"
+        sudo userdel "$SERVICE_USER"
+    fi
+
+    echo "==> $SERVICE_NAME is uninstalled"
+}
+
+case "${1:-}" in
+    "") ;;
+    --uninstall)
+        uninstall
+        exit 0
+        ;;
+    *)
+        echo "Usage: $0 [--uninstall]" >&2
+        exit 1
+        ;;
+esac
 
 echo "==> Building (API + web app) into $PUBLISH_DIR"
 rm -rf "$PUBLISH_DIR"
