@@ -154,7 +154,12 @@ export function RecordingPlayerDialog({
         setReloadToken((t) => t + 1)
         onChanged()
       })
-      .catch((err) => setActionError(err.message))
+      .catch((err) => {
+        setActionError(err.message)
+        // What's shown may be out of date (e.g. it had already finished recording), so re-read it.
+        setReloadToken((t) => t + 1)
+        onChanged()
+      })
       .finally(() => setActionBusy(false))
   }
 

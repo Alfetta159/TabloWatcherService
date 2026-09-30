@@ -1,3 +1,4 @@
+using System.Net;
 using TabloWatcherService.Api.Models;
 using TabloWatcherService.Api.Services.Tablo;
 
@@ -289,15 +290,6 @@ public class RecordingsController(
             return Problem(statusCode: StatusCodes.Status409Conflict, detail: "This isn't being recorded right now.");
         }
 
-        var guidePath = recordings.GuidePathOf(recording);
-        var airing = guidePath is null ? null : airings.FindAiring(guidePath, recording.AiringDetails.Datetime);
-        if (airing is null)
-        {
-            return Problem(
-                statusCode: StatusCodes.Status404NotFound,
-                detail: "Couldn't find the guide airing this is being recorded from.");
-        }
-
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
@@ -306,7 +298,24 @@ public class RecordingsController(
 
         try
         {
+            var guidePath = recordings.GuidePathOf(recording);
+            var airing = guidePath is null ? null : airings.FindAiring(guidePath, recording.AiringDetails.Datetime);
+            if (airing is null)
+            {
+                // The cache can be behind the device: once the airing is over it drops out of
+                // the guide, and the recording has finished on its own.
+                return await AlreadyStoppedAsync(client, request.Path)
+                    ?? Problem(
+                        statusCode: StatusCodes.Status404NotFound,
+                        detail: "Couldn't find the guide airing this is being recorded from.");
+            }
+
             var response = await client.SetAiringScheduledAsync(airing.Path.TrimStart('/'), new ScheduleRequest(false));
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                // Likewise: the device has already dropped the airing from its guide.
+                return await AlreadyStoppedAsync(client, request.Path) ?? response.ToErrorResult();
+            }
             if (!response.IsSuccessStatusCode)
             {
                 return response.ToErrorResult();
@@ -331,6 +340,33 @@ public class RecordingsController(
         }
 
         return Ok(new { path = recording.Path, state = recording.VideoDetails?.State });
+    }
+
+    // Stop's answer when the recording is no longer being recorded - it finished, or was
+    // stopped or deleted elsewhere, since the cache last saw it - after bringing the cache up to
+    // date. Null if it's still recording, or the device couldn't say.
+    private async Task<IActionResult?> AlreadyStoppedAsync(ITabloDeviceClient client, string path)
+    {
+        var response = await client.PostBatchAsync<RecordedAiring>([path]);
+        if (response is not { IsSuccessStatusCode: true, Content: not null }
+            || !response.Content.TryGetValue(path, out var current))
+        {
+            return null;
+        }
+
+        // The batch answers null for a path that no longer exists.
+        if (current is null)
+        {
+            recordings.Remove(path);
+            return Problem(statusCode: StatusCodes.Status404NotFound, detail: "This recording is no longer on the Tablo.");
+        }
+        if (current.VideoDetails?.State == "recording")
+        {
+            return null;
+        }
+
+        recordings.Upsert(current);
+        return Ok(new { path = current.Path, state = current.VideoDetails?.State });
     }
 
     /// <summary>
