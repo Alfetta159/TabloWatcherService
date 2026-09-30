@@ -67,9 +67,9 @@ which also starts at boot. Open `http://localhost:8080`, or **Tablo Watcher** in
 menu. To update, download the newer package from the Releases page and install it the same way -
 it upgrades in place and keeps your settings.
 
-If you previously installed with `deploy/install.sh`, first delete the unit file it
-installed (`sudo rm /etc/systemd/system/tablowatcherservice.service`). Otherwise it takes
-precedence over the package's own unit file.
+If you previously installed with `deploy/install.sh`, first uninstall that with
+`deploy/install.sh --uninstall`. Otherwise the unit file it installed takes precedence over
+the package's own.
 
 To uninstall, run `sudo apt remove tablowatcherservice` or `sudo dnf remove tablowatcherservice`.
 Your settings stay in `/opt/tablowatcherservice` in case you reinstall; `sudo apt purge
@@ -230,6 +230,13 @@ It builds the app, creates a `tablowatcher` system user if needed, copies the bu
 `/opt/tablowatcherservice`, installs [deploy/tablowatcherservice.service](deploy/tablowatcherservice.service),
 and starts the service so it also starts at boot. Run it again whenever you want to update
 the service to your latest code.
+
+To remove it again - the service, its unit file, `/opt/tablowatcherservice` and the
+`tablowatcher` user:
+
+```bash
+deploy/install.sh --uninstall
+```
 
 The service listens on port **8080** (browse to `http://<host>:8080/`), set by the unit
 file, so it can run alongside a development session on 5080.
