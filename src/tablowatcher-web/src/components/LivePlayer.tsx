@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
 import { LoaderCircle } from 'lucide-react'
 
@@ -68,6 +68,30 @@ function play(video: HTMLVideoElement) {
   })
 }
 
+// A player closed while in picture-in-picture (e.g. its dialog was closed) keeps playing
+// there: its video is moved out of the page, still in the document so the browser doesn't
+// pause it, and torn down once picture-in-picture is closed or another player starts.
+let detached: { video: HTMLVideoElement; teardown: () => void } | null = null
+
+function keepPlayingDetached(video: HTMLVideoElement, teardown: () => void) {
+  endDetached()
+  video.style.cssText = 'position:fixed;left:-10000px;top:0;width:1px;height:1px;opacity:0;pointer-events:none'
+  document.body.appendChild(video)
+  detached = { video, teardown }
+  video.addEventListener('leavepictureinpicture', () => {
+    if (detached?.video === video) endDetached()
+  }, { once: true })
+}
+
+function endDetached() {
+  if (!detached) return
+  const { video, teardown } = detached
+  detached = null
+  if (document.pictureInPictureElement === video) document.exitPictureInPicture().catch(() => {})
+  teardown()
+  video.remove()
+}
+
 export function LivePlayer({
   playlistUrl,
   tuningLabel,
@@ -77,49 +101,40 @@ export function LivePlayer({
   loadingMessage,
   errorMessage = "Couldn't play this channel",
 }: LivePlayerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  // The <video> is created here rather than rendered, so it can outlive this component in
+  // picture-in-picture (see keepPlayingDetached).
+  const hostRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
 
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video || !playlistUrl) return
+  // A layout effect, so its cleanup runs while the video is still in the page: moving it out
+  // then doesn't pause it.
+  useLayoutEffect(() => {
+    const host = hostRef.current
+    if (!host || !playlistUrl) return
 
+    // Only one stream at a time.
+    endDetached()
+
+    const video = document.createElement('video')
+    // Fills the pane, letterboxed to the video's own aspect ratio.
+    video.className = 'h-full w-full object-contain'
+    video.controls = true
     video.volume = audioSettings.volume
     video.muted = audioSettings.muted
+    video.addEventListener('playing', () => setPlaying(true))
+    video.addEventListener('volumechange', () => saveAudioSettings(video))
+    host.appendChild(video)
 
-    if (Hls.isSupported()) {
-      // -1 is hls.js's default: the live edge for live streams, the start otherwise.
-      const hls = new Hls({ startPosition: startAt ?? -1 })
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) setError(data.details)
-      })
-      hls.loadSource(playlistUrl)
-      hls.attachMedia(video)
-      play(video)
-
-      return () => hls.destroy()
-    }
-
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      const onError = () => setError(video.error?.message || `media error ${video.error?.code}`)
-      const onLoadedMetadata = () => {
-        if (startAt !== undefined) video.currentTime = startAt
-      }
-      video.addEventListener('error', onError)
-      video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true })
-      video.src = playlistUrl
-      play(video)
-
-      return () => {
-        video.removeEventListener('error', onError)
-        video.removeEventListener('loadedmetadata', onLoadedMetadata)
-        video.removeAttribute('src')
-        video.load()
+    const teardown = attachStream(video, playlistUrl, startAt, setError)
+    return () => {
+      if (document.pictureInPictureElement === video) {
+        keepPlayingDetached(video, teardown)
+      } else {
+        teardown()
+        video.remove()
       }
     }
-
-    setError('HLS playback is not supported in this browser')
   }, [playlistUrl, startAt])
 
   if (!tuningLabel) {
@@ -143,17 +158,7 @@ export function LivePlayer({
 
   return (
     <div className={`relative flex items-center justify-center ${className ?? ''}`}>
-      {playlistUrl && (
-        // eslint-disable-next-line jsx-a11y/media-has-caption
-        <video
-          ref={videoRef}
-          // Fills the pane, letterboxed to the video's own aspect ratio.
-          className="h-full w-full object-contain"
-          controls
-          onPlaying={() => setPlaying(true)}
-          onVolumeChange={(e) => saveAudioSettings(e.currentTarget)}
-        />
-      )}
+      {playlistUrl && <div ref={hostRef} className="h-full w-full" />}
       {!playing && (
         <div className="absolute inset-0 flex items-center justify-center gap-2 p-4 text-sm text-white/60">
           <LoaderCircle className="size-4 shrink-0 animate-spin" aria-hidden />
@@ -162,4 +167,46 @@ export function LivePlayer({
       )}
     </div>
   )
+}
+
+// Starts playlistUrl playing in video; returns what stops it.
+function attachStream(
+  video: HTMLVideoElement,
+  playlistUrl: string,
+  startAt: number | undefined,
+  setError: (error: string) => void,
+): () => void {
+  if (Hls.isSupported()) {
+    // -1 is hls.js's default: the live edge for live streams, the start otherwise.
+    const hls = new Hls({ startPosition: startAt ?? -1 })
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (data.fatal) setError(data.details)
+    })
+    hls.loadSource(playlistUrl)
+    hls.attachMedia(video)
+    play(video)
+
+    return () => hls.destroy()
+  }
+
+  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    const onError = () => setError(video.error?.message || `media error ${video.error?.code}`)
+    const onLoadedMetadata = () => {
+      if (startAt !== undefined) video.currentTime = startAt
+    }
+    video.addEventListener('error', onError)
+    video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true })
+    video.src = playlistUrl
+    play(video)
+
+    return () => {
+      video.removeEventListener('error', onError)
+      video.removeEventListener('loadedmetadata', onLoadedMetadata)
+      video.removeAttribute('src')
+      video.load()
+    }
+  }
+
+  setError('HLS playback is not supported in this browser')
+  return () => {}
 }
