@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AppStream metadata: what software centers (GNOME Software, KDE Discover, Ubuntu's App
+  Center) show on the app's page - description, license, age rating and release notes.
+  packaging/build-packages.sh fills in the release (version, date, type and the changes since
+  the previous tag) and installs it as
+  /usr/share/metainfo/io.github.alfetta159.TabloWatcherService.metainfo.xml.
+-->
+<component type="desktop-application">
+  <id>io.github.alfetta159.TabloWatcherService</id>
+  <name>Tablo Watcher</name>
+  <summary>Watch and configure recordings on your Tablo DVR</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.alfetta159">
+    <name>Daniel R. Przybylski</name>
+  </developer>
+
+  <description>
+    <p>
+      Watch live TV, browse the guide and manage recordings on a legacy Tablo DVR, from any
+      browser on your home network. Tablo Watcher runs in the background on this computer;
+      opening it from the app menu opens it in your browser.
+    </p>
+    <ul>
+      <li>A channels-by-time guide grid, with live TV playing in the browser</li>
+      <li>Your recordings by show, movie and sports event: watch, resume, mark watched, protect or delete them</li>
+      <li>Search the guide, and set up series recordings or record single airings</li>
+      <li>See what is scheduled, and sort out conflicts when there aren't enough tuners</li>
+      <li>Channel details and how the Tablo's storage is being used</li>
+    </ul>
+    <p>
+      Tablo Watcher is an independent project, not associated with Tablo or Nuvyyo.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">tablowatcherservice.desktop</launchable>
+  <icon type="stock">tablowatcherservice</icon>
+
+  <url type="homepage">https://github.com/Alfetta159/TabloWatcherService</url>
+  <url type="bugtracker">https://github.com/Alfetta159/TabloWatcherService/issues</url>
+  <url type="vcs-browser">https://github.com/Alfetta159/TabloWatcherService</url>
+
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+    <category>TV</category>
+  </categories>
+
+  <!-- No objectionable content of its own: suitable for all ages. -->
+  <content_rating type="oars-1.1" />
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <releases>
+    <release version="@VERSION@" date="@DATE@" type="@RELEASE_TYPE@">
+      <url type="details">https://github.com/Alfetta159/TabloWatcherService/releases/tag/v@SEMVER@</url>
+      <description>
+@CHANGES@
+      </description>
+    </release>
+  </releases>
+</component>
