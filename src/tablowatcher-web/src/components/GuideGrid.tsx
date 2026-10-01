@@ -172,8 +172,8 @@ const POLL_INTERVAL_MS = 60_000
 // Until the server's first airings refresh lands, check back often so listings appear promptly.
 const LOADING_POLL_INTERVAL_MS = 5_000
 
-function formatUpdatedAt(updatedAt: string): string {
-  const seconds = Math.max(0, Math.round((Date.now() - new Date(updatedAt).getTime()) / 1000))
+function formatUpdatedAt(updatedAt: string, now: number): string {
+  const seconds = Math.max(0, Math.round((now - new Date(updatedAt).getTime()) / 1000))
   if (seconds < 60) return 'just now'
   const minutes = Math.round(seconds / 60)
   return `${minutes}m ago`
@@ -183,6 +183,34 @@ function roundDownToHalfHour(date: Date): Date {
   const rounded = new Date(date)
   rounded.setMinutes(date.getMinutes() < 30 ? 0 : 30, 0, 0)
   return rounded
+}
+
+// The current time, updated on every minute - and straight away when the page comes back into
+// view, since background tabs (and sleeping machines) hold timers back.
+function useMinuteClock(): number {
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    function tick() {
+      setNow(Date.now())
+      timer = setTimeout(tick, 60_000 - (Date.now() % 60_000))
+    }
+    function onVisibilityChange() {
+      if (document.visibilityState !== 'visible') return
+      clearTimeout(timer)
+      tick()
+    }
+
+    timer = setTimeout(tick, 60_000 - (Date.now() % 60_000))
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [])
+
+  return now
 }
 
 function formatTick(date: Date): string {
@@ -206,13 +234,24 @@ interface GuideGridProps {
 }
 
 export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }: GuideGridProps) {
-  const [windowStart, setWindowStart] = useState(() => roundDownToHalfHour(new Date()))
+  const now = useMinuteClock()
+  // The window paged to with the arrows; null follows the clock, moving on every half hour.
+  const [pinnedStart, setPinnedStart] = useState<number | null>(null)
+  const currentStart = roundDownToHalfHour(new Date(now)).getTime()
+  const windowStartMs = pinnedStart ?? currentStart
   const [data, setData] = useState<GuideGridResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null)
 
-  const windowEnd = useMemo(() => new Date(windowStart.getTime() + WINDOW_MS), [windowStart])
+  const windowStart = useMemo(() => new Date(windowStartMs), [windowStartMs])
+  const windowEnd = useMemo(() => new Date(windowStartMs + WINDOW_MS), [windowStartMs])
+
+  // Paging back to the current window goes back to following the clock.
+  function pageBy(windows: number) {
+    const start = windowStartMs + windows * WINDOW_MS
+    setPinnedStart(start === currentStart ? null : start)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -259,11 +298,10 @@ export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }
     return result
   }, [windowStart, windowEnd])
 
-  const nowOffset = useMemo(() => {
-    const now = Date.now()
-    if (now < windowStart.getTime() || now > windowEnd.getTime()) return null
-    return ((now - windowStart.getTime()) / WINDOW_MS) * (WINDOW_HOURS * HOUR_WIDTH_PX)
-  }, [windowStart])
+  const nowOffset =
+    now < windowStartMs || now > windowEnd.getTime()
+      ? null
+      : ((now - windowStartMs) / WINDOW_MS) * (WINDOW_HOURS * HOUR_WIDTH_PX)
 
   function positionOf(airing: GridAiring) {
     const start = new Date(airing.airingDetails.datetime).getTime()
@@ -291,7 +329,7 @@ export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }
             {windowEnd.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </span>
           {data?.updatedAt ? (
-            <span className="text-muted-foreground text-xs">Updated {formatUpdatedAt(data.updatedAt)}</span>
+            <span className="text-muted-foreground text-xs">Updated {formatUpdatedAt(data.updatedAt, now)}</span>
           ) : (
             <span className="text-muted-foreground flex items-center gap-1 self-center text-xs">
               <LoaderCircle className="size-3 animate-spin" aria-hidden />
@@ -303,17 +341,17 @@ export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setWindowStart(new Date(windowStart.getTime() - WINDOW_MS))}
+            onClick={() => pageBy(-1)}
           >
             <ChevronLeft className="size-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setWindowStart(roundDownToHalfHour(new Date()))}>
+          <Button variant="outline" size="sm" onClick={() => setPinnedStart(null)}>
             Now
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setWindowStart(new Date(windowStart.getTime() + WINDOW_MS))}
+            onClick={() => pageBy(1)}
           >
             <ChevronRight className="size-4" />
           </Button>
