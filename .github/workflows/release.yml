@@ -20,6 +20,9 @@ jobs:
       NFPM_VERSION: 2.47.0
     steps:
       - uses: actions/checkout@v5
+        with:
+          # The packages' AppStream release notes list what was merged since the previous tag.
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v5
         with:

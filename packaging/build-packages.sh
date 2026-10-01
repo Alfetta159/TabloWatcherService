@@ -28,6 +28,47 @@ if ! command -v "$NFPM" &>/dev/null; then
     exit 1
 fi
 
+# AppStream metadata for software centers (see packaging/linux/tablowatcherservice.metainfo.xml),
+# with this release's notes: the titles of the pull requests merged since the previous tag.
+# Needs the full history and tags (the release workflow checks out with fetch-depth: 0).
+write_metainfo() {
+    local out="$1" previous changes="" title
+    previous="$(git -C "$REPO_ROOT" describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)"
+    if [[ -n "$previous" ]]; then
+        # A merge commit's body starts with the pull request's title.
+        while IFS= read -r title; do
+            [[ -n "$title" ]] || continue
+            title="${title//&/&amp;}"
+            title="${title//</&lt;}"
+            title="${title//>/&gt;}"
+            changes+="          <li>$title</li>"$'\n'
+        done < <(git -C "$REPO_ROOT" log --merges --format='%b%x00' "$previous..HEAD" \
+            | awk 'BEGIN { RS = "\0" } { sub(/^\n+/, ""); split($0, lines, "\n"); print lines[1] }')
+    fi
+    if [[ -n "$changes" ]]; then
+        changes="        <p>Changes since ${previous#v}:</p>"$'\n'"        <ul>"$'\n'"$changes        </ul>"
+    else
+        changes="        <p>See the release notes on GitHub.</p>"
+    fi
+
+    local release_type=stable
+    if [[ "$VERSION" == *-* ]]; then release_type=development; fi
+
+    # The package version (0.1.0~preview1, see nfpm.yaml), so it matches what's installed.
+    local template="$PACKAGING_DIR/linux/tablowatcherservice.metainfo.xml" line
+    while IFS= read -r line; do
+        if [[ "$line" == "@CHANGES@" ]]; then
+            printf '%s\n' "$changes"
+            continue
+        fi
+        line="${line//@VERSION@/${VERSION//-/\~}}"
+        line="${line//@SEMVER@/$VERSION}"
+        line="${line//@DATE@/$(date -u +%Y-%m-%d)}"
+        line="${line//@RELEASE_TYPE@/$release_type}"
+        printf '%s\n' "$line"
+    done < "$template" > "$out"
+}
+
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
@@ -51,6 +92,7 @@ for arch in "${ARCHES[@]}"; do
         -o "$APP_DIR"
     # Development settings (dev caches, verbose logging) have no business on an installed system.
     rm -f "$APP_DIR/appsettings.Development.json"
+    write_metainfo "$STAGING_DIR/tablowatcherservice.metainfo.xml"
 
     for packager in deb rpm; do
         echo "==> Building $packager ($arch)"
