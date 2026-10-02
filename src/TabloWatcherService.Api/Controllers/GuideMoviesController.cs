@@ -14,7 +14,7 @@ public class GuideMoviesController(ITabloDeviceClientFactory clientFactory) : Ta
     {
         var client = ClientFactory.Create(ip, port);
         var response = await client.GetGuideMovieAsync(movieId);
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessful)
         {
             return response.ToErrorResult();
         }

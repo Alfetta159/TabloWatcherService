@@ -34,7 +34,7 @@ public class ChannelsController(
         try
         {
             var pathsResponse = await client.GetGuideChannelsAsync();
-            if (!pathsResponse.IsSuccessStatusCode)
+            if (!pathsResponse.IsSuccessful)
             {
                 return pathsResponse.ToErrorResult();
             }

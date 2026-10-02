@@ -11,7 +11,7 @@ public class SeriesSeasonsController(ITabloDeviceClientFactory clientFactory) : 
     {
         var client = clientFactory.Create(ip, port);
         var response = await client.GetSeriesSeasonAsync(seasonId);
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessful)
         {
             return response.ToErrorResult();
         }

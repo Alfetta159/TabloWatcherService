@@ -264,7 +264,7 @@ public class RecordingsController(
             return StatusCode(StatusCodes.Status502BadGateway);
         }
 
-        if (!response.IsSuccessStatusCode || response.Content is null)
+        if (!response.IsSuccessful || response.Content is null)
         {
             return response.ToErrorResult();
         }
@@ -316,7 +316,7 @@ public class RecordingsController(
                 // Likewise: the device has already dropped the airing from its guide.
                 return await AlreadyStoppedAsync(client, request.Path) ?? response.ToErrorResult();
             }
-            if (!response.IsSuccessStatusCode)
+            if (!response.IsSuccessful)
             {
                 return response.ToErrorResult();
             }
@@ -404,7 +404,7 @@ public class RecordingsController(
             return StatusCode(StatusCodes.Status502BadGateway);
         }
 
-        if (!response.IsSuccessStatusCode || response.Content is null)
+        if (!response.IsSuccessful || response.Content is null)
         {
             return response.ToErrorResult();
         }
@@ -438,7 +438,7 @@ public class RecordingsController(
         try
         {
             var response = await client.DeleteRecordingAsync(request.Path.TrimStart('/'));
-            if (!response.IsSuccessStatusCode)
+            if (!response.IsSuccessful)
             {
                 return response.ToErrorResult();
             }

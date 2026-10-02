@@ -23,7 +23,7 @@ public class StorageController(IRecordingsStore recordings, ICurrentTabloDeviceR
         try
         {
             var response = await client.GetHardDrivesAsync();
-            if (!response.IsSuccessStatusCode)
+            if (!response.IsSuccessful)
             {
                 return response.ToErrorResult();
             }
