@@ -119,7 +119,7 @@ public class TvShowsController(
             var current = await client.GetGuideSeriesByIdAsync(seriesId);
             if (!current.IsSuccessStatusCode || current.Content is null)
             {
-                return current.IsSuccessStatusCode ? StatusCode(StatusCodes.Status502BadGateway) : current.ToErrorResult();
+                return current.ToErrorResult();
             }
 
             // A channel limit must be one the show airs on - or the one already set, which
@@ -144,7 +144,7 @@ public class TvShowsController(
                 var updated = await client.UpdateGuideSeriesAsync(seriesId, new JsonObject { ["schedule"] = request.Rule });
                 if (!updated.IsSuccessStatusCode || updated.Content is null)
                 {
-                    return updated.IsSuccessStatusCode ? StatusCode(StatusCodes.Status502BadGateway) : updated.ToErrorResult();
+                    return updated.ToErrorResult();
                 }
                 live = updated.Content;
             }
@@ -177,7 +177,7 @@ public class TvShowsController(
                 });
                 if (!updated.IsSuccessStatusCode || updated.Content is null)
                 {
-                    return updated.IsSuccessStatusCode ? StatusCode(StatusCodes.Status502BadGateway) : updated.ToErrorResult();
+                    return updated.ToErrorResult();
                 }
                 live = updated.Content;
             }

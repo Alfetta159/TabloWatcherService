@@ -78,8 +78,8 @@ interface Recorder {
   serverVersion: string
   publicIp: string
   privateIp: string
-  http: number
-  slip: number
+  http: number | null
+  slip: number | null
   lastSeen: string
   modified: string
   inserted: string
@@ -543,7 +543,8 @@ function App() {
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Address</span>
                   <span>
-                    {server.privateIp}:{server.http}
+                    {server.privateIp}
+                    {server.http != null && `:${server.http}`}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

@@ -25,7 +25,7 @@ public class WatchController(ICurrentTabloDeviceResolver deviceResolver) : Contr
         }
 
         var response = await client.WatchChannelAsync(channelId);
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessful)
         {
             return response.ToErrorResult();
         }
@@ -46,7 +46,7 @@ public class WatchController(ICurrentTabloDeviceResolver deviceResolver) : Contr
         }
 
         var tuners = await client.GetTunersAsync();
-        if (!tuners.IsSuccessStatusCode || tuners.Content is null)
+        if (!tuners.IsSuccessful || tuners.Content is null)
         {
             return tuners.ToErrorResult();
         }

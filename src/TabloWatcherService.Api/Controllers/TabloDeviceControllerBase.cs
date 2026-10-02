@@ -21,7 +21,7 @@ public abstract class TabloDeviceControllerBase<TResponse,TBatchResponse>(ITablo
     {
         var client = ClientFactory.Create(ip, port);
         var response = await GetResponseAsync(client);
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessful)
         {
             return response.ToErrorResult();
         }
@@ -34,7 +34,7 @@ public abstract class TabloDeviceControllerBase<TResponse,TBatchResponse>(ITablo
     {
         var client = ClientFactory.Create(ip, port);
         var response = await PostBatchAsync(client, paths);
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessful)
         {
             return response.ToErrorResult();
         }

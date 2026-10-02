@@ -51,7 +51,7 @@ public class AiringsController(ICurrentTabloDeviceResolver deviceResolver, IAiri
 
         if (!response.IsSuccessStatusCode || response.Content?.Schedule is null)
         {
-            return response.IsSuccessStatusCode ? StatusCode(StatusCodes.Status502BadGateway) : response.ToErrorResult();
+            return response.ToErrorResult();
         }
 
         store.UpdateSchedule(request.Path, response.Content.Schedule);

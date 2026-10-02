@@ -14,7 +14,7 @@ public class GuideSeriesController(ITabloDeviceClientFactory clientFactory) : Ta
     {
         var client = ClientFactory.Create(ip, port);
         var response = await client.GetGuideSeriesByIdAsync(seriesId);
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessful)
         {
             return response.ToErrorResult();
         }

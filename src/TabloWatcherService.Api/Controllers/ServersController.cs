@@ -10,7 +10,7 @@ public class ServersController(IAssociationServerClient associationServerClient)
     public async Task<IActionResult> Get()
     {
         var response = await associationServerClient.GetRecordersAsync();
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessful)
         {
             return response.ToErrorResult();
         }

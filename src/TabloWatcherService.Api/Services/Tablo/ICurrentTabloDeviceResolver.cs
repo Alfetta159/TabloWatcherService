@@ -37,7 +37,7 @@ public class CurrentTabloDeviceResolver(
         }
 
         var recordersResponse = await associationServerClient.GetRecordersAsync();
-        if (recordersResponse.IsSuccessStatusCode)
+        if (recordersResponse.IsSuccessful)
         {
             _lastKnownIp = recordersResponse.Content?.Recorders.FirstOrDefault()?.PrivateIp;
             _lastLookup = DateTimeOffset.UtcNow;
@@ -49,6 +49,7 @@ public class CurrentTabloDeviceResolver(
         else
         {
             logger.LogWarning(
+                recordersResponse.Error,
                 "Association server lookup failed ({Status}); {Fallback}",
                 recordersResponse.StatusCode,
                 _lastKnownIp is null ? "no previously known device to fall back to" : $"falling back to {_lastKnownIp}");

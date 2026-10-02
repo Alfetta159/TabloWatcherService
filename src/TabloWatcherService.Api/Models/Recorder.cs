@@ -9,8 +9,8 @@ public class Recorder
     public string ServerVersion { get; set; } = string.Empty;
     public string PublicIp { get; set; } = string.Empty;
     public string PrivateIp { get; set; } = string.Empty;
-    public int Http { get; set; }
-    public int Slip { get; set; }
+    public int? Http { get; set; }
+    public int? Slip { get; set; }
     public DateTime LastSeen { get; set; }
     public DateTime Modified { get; set; }
     public DateTime Inserted { get; set; }
