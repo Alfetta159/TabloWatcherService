@@ -90,7 +90,7 @@ function nowPlayingAiring(airings: GridAiring[]): GridAiring | null {
   )
 }
 
-function selectionForChannel(c: GridChannel): SelectedProgram {
+function selectionForChannel(c: GridChannel, noListings: boolean): SelectedProgram {
   const nowPlaying = nowPlayingAiring(c.airings)
   if (nowPlaying) {
     return {
@@ -105,9 +105,13 @@ function selectionForChannel(c: GridChannel): SelectedProgram {
     }
   }
 
+  const { major, minor, network } = c.channel.channel
   return {
     title: c.channel.channel.callSign,
-    subtitle: c.channel.channel.network,
+    // With no listings at all (an expired or empty guide), the channel is all there is to show.
+    subtitle: [`${major}.${minor}`, network, noListings && 'No listings available']
+      .filter(Boolean)
+      .join(' · '),
     description: null,
     backgroundImageUrl: null,
     thumbnailImageUrl: null,
@@ -220,6 +224,21 @@ function formatTick(date: Date): string {
   })
 }
 
+// One row per channel on the device, with whatever airings the guide has for it - so the
+// channels still show (and can be tuned) while the guide is loading or has no listings. Any
+// channel the guide has that the device's list doesn't (or isn't loaded yet) is kept too.
+function gridRows(channels: GridChannelInfo[] | undefined, data: GuideGridResponse | null): GridChannel[] {
+  const gridChannels = data?.updatedAt ? data.channels : []
+  if (!channels?.length) return gridChannels
+
+  const airingsById = new Map(gridChannels.map((c) => [c.channel.objectId, c.airings]))
+  const listed = new Set(channels.map((c) => c.objectId))
+  return [
+    ...channels.map((channel) => ({ channel, airings: airingsById.get(channel.objectId) ?? [] })),
+    ...gridChannels.filter((c) => !listed.has(c.channel.objectId)),
+  ].sort((a, b) => a.channel.channel.major - b.channel.channel.major || a.channel.channel.minor - b.channel.channel.minor)
+}
+
 interface GuideGridProps {
   // Fired for both channel and program clicks - updates the preview pane's details.
   onSelect?: (program: SelectedProgram) => void
@@ -317,8 +336,9 @@ export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }
   }
 
   const listingsLoading = !data?.updatedAt
-  const rows: GridChannel[] =
-    data?.updatedAt || !channels ? (data?.channels ?? []) : channels.map((channel) => ({ channel, airings: [] }))
+  // The server's grid only has channels with airings, so it's empty when the guide is.
+  const noListings = !listingsLoading && data.channels.length === 0
+  const rows = useMemo(() => gridRows(channels, data), [channels, data])
 
   return (
     <>
@@ -329,7 +349,9 @@ export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }
             {windowEnd.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </span>
           {data?.updatedAt ? (
-            <span className="text-muted-foreground text-xs">Updated {formatUpdatedAt(data.updatedAt, now)}</span>
+            <span className="text-muted-foreground text-xs">
+              {noListings ? 'No TV listings available' : `Updated ${formatUpdatedAt(data.updatedAt, now)}`}
+            </span>
           ) : (
             <span className="text-muted-foreground flex items-center gap-1 self-center text-xs">
               <LoaderCircle className="size-3 animate-spin" aria-hidden />
@@ -378,7 +400,7 @@ export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }
                 onClick={() => {
                   setSelectedChannelId(c.channel.objectId)
                   setSelectedKey(null)
-                  onSelect?.(selectionForChannel(c))
+                  onSelect?.(selectionForChannel(c, noListings))
                   onWatchChannel?.({ objectId: c.channel.objectId, tuningLabel: tuningLabelFor(c) })
                 }}
               >
