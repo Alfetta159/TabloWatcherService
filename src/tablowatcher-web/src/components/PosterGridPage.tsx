@@ -409,6 +409,15 @@ export function PosterGridPage<T>({
         </Alert>
       )}
 
+      {data?.updatedAt && data.items.length === 0 && (
+        <Alert>
+          <AlertTitle>TV listings are not available</AlertTitle>
+          <AlertDescription>
+            The Tablo's guide has no upcoming {noun[1]} right now. This page fills in once the Tablo has listings again.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4">
         {visible.map(({ card, channels }) => (
           <PosterCard
