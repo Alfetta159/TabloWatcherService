@@ -15,6 +15,19 @@ fi
 # The service writes its runtime state (e.g. blocked-tags.json) next to the app.
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
 
+# A unit left in /etc by deploy/install.sh (the pre-package manual install) overrides this
+# package's own in /usr/lib, and runs `dotnet TabloWatcherService.Api.dll` - a file this
+# package doesn't ship, so the service would keep running that old build while serving the
+# new pages. Moved aside (systemd ignores the new name) only when it's recognizably that unit;
+# any other override is the admin's, and left alone.
+LEGACY_UNIT="/etc/systemd/system/$SERVICE_NAME.service"
+if [ -f "$LEGACY_UNIT" ] && grep -q 'TabloWatcherService\.Api\.dll' "$LEGACY_UNIT"; then
+    mv "$LEGACY_UNIT" "$LEGACY_UNIT.from-install-sh"
+    echo
+    echo "Moved the old deploy/install.sh unit aside to $LEGACY_UNIT.from-install-sh"
+    echo "so the service runs this package's version. You can delete that file."
+fi
+
 # Skipped where systemd isn't running (containers, chroots) - the files are still installed.
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload
