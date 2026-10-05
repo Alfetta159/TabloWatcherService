@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RecordingPill } from '@/components/Recording'
 import { RecordedShowDialog } from '@/components/RecordedShowDialog'
 import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog'
+import { SchedulePage } from '@/components/SchedulePage'
 import type { ChannelInfo } from '@/components/PosterGridPage'
 import { compareTitles, formatSize } from '@/lib/format'
 import type { RecordingState } from '@/lib/recording'
@@ -58,21 +59,25 @@ interface ListResponse<T> {
   items: T[]
 }
 
-type Tab = 'all' | 'tv' | 'movie' | 'sport' | 'scheduled'
+type Tab = 'all' | 'tv' | 'movie' | 'sport' | 'manual' | 'scheduled' | 'conflicts'
 
 const TABS: [Tab, string][] = [
   ['all', 'All'],
   ['tv', 'TV Shows'],
   ['movie', 'Movies'],
   ['sport', 'Sports'],
+  ['manual', 'Manual'],
   ['scheduled', 'Scheduled'],
+  ['conflicts', 'Conflicts'],
 ]
 
-// Programs (e.g. local newscasts) are TV too, just without series data behind them.
-const TAB_KINDS: Record<Exclude<Tab, 'all' | 'scheduled'>, Kind[]> = {
-  tv: ['tv', 'program'],
+// Programs are what manual recordings (the Manual page) record into: a channel and time
+// slot, with no series data behind them.
+const TAB_KINDS: Record<Exclude<Tab, 'all' | 'scheduled' | 'conflicts'>, Kind[]> = {
+  tv: ['tv'],
   movie: ['movie'],
   sport: ['sport'],
+  manual: ['program'],
 }
 
 type SortOrder = 'name' | 'date'
@@ -260,7 +265,9 @@ export function RecordingsPage() {
 
   // Newest recordings first; soonest scheduled airings first. Ties go by title.
   const visibleRecorded = useMemo(() => {
-    const items = (recorded.data?.items ?? []).filter((g) => tab === 'all' || (tab !== 'scheduled' && TAB_KINDS[tab].includes(g.kind)))
+    const items = (recorded.data?.items ?? []).filter(
+      (g) => tab === 'all' || (tab !== 'scheduled' && tab !== 'conflicts' && TAB_KINDS[tab].includes(g.kind)),
+    )
     return items.sort((a, b) =>
       sortOrder === 'date'
         ? Date.parse(b.latestRecordedAt) - Date.parse(a.latestRecordedAt) || compareTitles(a.title, b.title)
@@ -293,78 +300,85 @@ export function RecordingsPage() {
         </TabsList>
       </Tabs>
 
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="recordings-sort">Sort by</Label>
-          <select
-            id="recordings-sort"
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-            className="border-input bg-background focus-visible:ring-ring/50 h-9 min-w-40 rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
-          >
-            <option value="name">Name</option>
-            <option value="date">{showingScheduled ? 'Air date' : 'Date recorded'}</option>
-          </select>
-        </div>
-        {current.data?.updatedAt && (
-          <p className="text-muted-foreground text-sm">
+      {tab === 'conflicts' ? (
+        // Its own filters, sorting and Record / Cancel - the old Scheduled page.
+        <SchedulePage initialConflictsOnly />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="recordings-sort">Sort by</Label>
+              <select
+                id="recordings-sort"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                className="border-input bg-background focus-visible:ring-ring/50 h-9 min-w-40 rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+              >
+                <option value="name">Name</option>
+                <option value="date">{showingScheduled ? 'Air date' : 'Date recorded'}</option>
+              </select>
+            </div>
+            {current.data?.updatedAt && (
+              <p className="text-muted-foreground text-sm">
+                {showingScheduled
+                  ? `${count} airing${count === 1 ? '' : 's'} set to record`
+                  : `${count} title${count === 1 ? '' : 's'} · ${recordingTotal} recording${recordingTotal === 1 ? '' : 's'}`}
+              </p>
+            )}
+          </div>
+
+          {current.error && (
+            <Alert variant="destructive">
+              <AlertTitle>Couldn't reach the API</AlertTitle>
+              <AlertDescription>
+                {showingScheduled ? '/api/recordings/scheduled' : '/api/recordings'} returned an error: {current.error}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {current.data && !current.data.updatedAt && (
+            <Alert>
+              <AlertTitle>{showingScheduled ? 'The guide is still loading' : 'Recordings are still loading'}</AlertTitle>
+              <AlertDescription>
+                The server hasn't finished reading {showingScheduled ? 'the guide' : 'the recordings'} from the Tablo yet.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4">
             {showingScheduled
-              ? `${count} airing${count === 1 ? '' : 's'} set to record`
-              : `${count} title${count === 1 ? '' : 's'} · ${recordingTotal} recording${recordingTotal === 1 ? '' : 's'}`}
-          </p>
-        )}
-      </div>
-
-      {current.error && (
-        <Alert variant="destructive">
-          <AlertTitle>Couldn't reach the API</AlertTitle>
-          <AlertDescription>
-            {showingScheduled ? '/api/recordings/scheduled' : '/api/recordings'} returned an error: {current.error}
-          </AlertDescription>
-        </Alert>
+              ? visibleScheduled.map((item) => (
+                  <RecordingCard
+                    key={item.key}
+                    title={item.title}
+                    subtitle={item.subtitle}
+                    description={item.description}
+                    imageId={posterImageId(item)}
+                    pill={item.recordingState && <RecordingPill state={item.recordingState} />}
+                    lines={[formatDateTime(item.datetime), `${item.channel.major}.${item.channel.minor} ${item.channel.callSign}`]}
+                    genres={item.genres}
+                  />
+                ))
+              : visibleRecorded.map((group) => (
+                  <RecordingCard
+                    key={group.key}
+                    title={group.title}
+                    subtitle={group.subtitle}
+                    description={group.description}
+                    imageId={posterImageId(group, group.snapshotImageId)}
+                    pill={group.inProgress && <RecordingNowPill />}
+                    lines={recordedLines(group)}
+                    genres={group.genres}
+                    onOpen={
+                      group.kind === 'movie' || group.kind === 'sport'
+                        ? () => setPlaying({ kind: group.kind as 'movie' | 'sport', path: group.key })
+                        : () => setOpenShow({ kind: group.kind as 'tv' | 'program', path: group.key })
+                    }
+                  />
+                ))}
+          </div>
+        </>
       )}
-
-      {current.data && !current.data.updatedAt && (
-        <Alert>
-          <AlertTitle>{showingScheduled ? 'The guide is still loading' : 'Recordings are still loading'}</AlertTitle>
-          <AlertDescription>
-            The server hasn't finished reading {showingScheduled ? 'the guide' : 'the recordings'} from the Tablo yet.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4">
-        {showingScheduled
-          ? visibleScheduled.map((item) => (
-              <RecordingCard
-                key={item.key}
-                title={item.title}
-                subtitle={item.subtitle}
-                description={item.description}
-                imageId={posterImageId(item)}
-                pill={item.recordingState && <RecordingPill state={item.recordingState} />}
-                lines={[formatDateTime(item.datetime), `${item.channel.major}.${item.channel.minor} ${item.channel.callSign}`]}
-                genres={item.genres}
-              />
-            ))
-          : visibleRecorded.map((group) => (
-              <RecordingCard
-                key={group.key}
-                title={group.title}
-                subtitle={group.subtitle}
-                description={group.description}
-                imageId={posterImageId(group, group.snapshotImageId)}
-                pill={group.inProgress && <RecordingNowPill />}
-                lines={recordedLines(group)}
-                genres={group.genres}
-                onOpen={
-                  group.kind === 'movie' || group.kind === 'sport'
-                    ? () => setPlaying({ kind: group.kind as 'movie' | 'sport', path: group.key })
-                    : () => setOpenShow({ kind: group.kind as 'tv' | 'program', path: group.key })
-                }
-              />
-            ))}
-      </div>
 
       <Dialog open={playing !== null} onOpenChange={(open) => !open && setPlaying(null)}>
         {playing !== null && (
