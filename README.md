@@ -149,9 +149,11 @@ way. It upgrades in place and keeps your settings.
 tablowatcherservice`. Your settings stay in `/opt/tablowatcherservice` in case you
 reinstall; `sudo apt purge tablowatcherservice` removes them too.
 
-If you previously installed with `deploy/install.sh`, first uninstall that with
-`deploy/install.sh --uninstall`. Otherwise the unit file it installed takes precedence over
-the package's own.
+If you previously installed with `deploy/install.sh`, the package moves the unit file that
+script installed aside (to `/etc/systemd/system/tablowatcherservice.service.from-install-sh`),
+since it would otherwise take precedence over the package's own and keep running the old
+build. The app's sidebar shows the version the server is running, and a banner warns if the
+page and the server are from different versions.
 
 ### Using it
 
@@ -441,6 +443,7 @@ server reports.
 | `GET /api/movies`, `/api/movies/{movieId}` | Upcoming movies; one movie's details and airings |
 | `GET /api/sports` | Upcoming sports events |
 | `PUT /api/airings/schedule` | Record, or cancel recording, one airing |
+| `GET /api/version` | The server's version and commit |
 | `GET /api/guide/listings` | Whether the guide has listings (hides TV Shows, Movies and Sports when not) |
 | `GET /api/schedule?includeSkipped=` | Everything set to record, with conflicts |
 | `GET /api/manual-recordings`, `/api/manual-recordings/channels` | Manual recordings; the channels one can be set on |

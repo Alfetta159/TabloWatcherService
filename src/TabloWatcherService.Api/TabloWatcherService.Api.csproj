@@ -4,6 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Local builds are "0.1.0-dev"; packaging/build-packages.sh (and so the release
+         workflow) sets the whole version from the tag with -p:Version, e.g. 0.1.0-preview9.
+         GET /api/version reports it, and the SPA is built with the same one (see BuildSpa) so
+         it can tell when it's talking to a server from a different build. -->
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>dev</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,9 +23,9 @@
 
   <ItemGroup>
     <!-- Runtime state and dev caches the app writes next to itself (see BlockedTagsStore,
-         DevCache). Never publish this machine's copies - a package upgrade would overwrite the
-         installed state with them. -->
-    <Content Remove="blocked-tags.json;dev-guide-cache.json;dev-recordings-cache.json" />
+         KeywordRulesStore, DevCache). Never publish this machine's copies - a package upgrade
+         would overwrite the installed state with them. -->
+    <Content Remove="blocked-tags.json;keyword-recordings.json;dev-guide-cache.json;dev-recordings-cache.json" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -39,7 +45,7 @@
        glob is evaluated before any target runs, so it's re-read here to pick up the new files. -->
   <Target Name="BuildSpa" BeforeTargets="BeforeBuild" Condition="'$(_IsPublishing)' == 'true'">
     <Exec Command="npm ci" WorkingDirectory="$(SpaRoot)" Condition="!Exists('$(SpaRoot)node_modules')" />
-    <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
+    <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" EnvironmentVariables="VITE_APP_VERSION=$(Version)" />
     <ItemGroup>
       <!-- By item, not by glob: a glob here only matches what's on disk now, missing the
            files Vite just deleted. -->

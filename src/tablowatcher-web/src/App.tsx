@@ -25,6 +25,7 @@ import { ResizableSplit } from '@/components/ResizableSplit'
 import { RecordingsPage } from '@/components/RecordingsPage'
 import { ManualPage } from '@/components/ManualPage'
 import { useGuideListings } from '@/hooks/useGuideListings'
+import { APP_VERSION, useServerVersion } from '@/hooks/useServerVersion'
 import { SearchPage } from '@/components/SearchPage'
 import { SettingsPage } from '@/components/SettingsPage'
 import { MoviesPage, SportsPage, TvShowsPage } from '@/components/UpcomingPages'
@@ -136,6 +137,12 @@ function App() {
   const hasListings = useGuideListings(() =>
     setSelectedNav((nav) => (GUIDE_LISTING_NAV.has(nav) ? NAV_ITEMS[0].label : nav)),
   )
+  const serverVersion = useServerVersion()
+  // This page came from one build and the server is running another - typically a service
+  // still running an old binary after an upgrade replaced the files it serves.
+  const serverVersionMismatch =
+    APP_VERSION !== undefined &&
+    (serverVersion === 'missing' || (serverVersion !== null && serverVersion.version !== APP_VERSION))
   const navItems = hasListings === false ? NAV_ITEMS.filter((item) => !GUIDE_LISTING_NAV.has(item.label)) : NAV_ITEMS
   const [channels, setChannels] = useState<GuideChannel[]>([])
   const [channelsLoading, setChannelsLoading] = useState(false)
@@ -369,8 +376,20 @@ function App() {
         )}
       </header>
 
+      {serverVersionMismatch && (
+        <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">
+          <AlertTitle>The server is running a different version</AlertTitle>
+          <AlertDescription>
+            This page is version {APP_VERSION}, but the server is running{' '}
+            {serverVersion === 'missing' ? 'an older one' : (serverVersion?.version ?? 'another one')}, so newer pages
+            won't work. Restart the tablowatcherservice service; if this stays, an older service unit may be overriding
+            the package's (see the README).
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-56 shrink-0 space-y-1 overflow-y-auto border-r p-3">
+        <aside className="flex w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r p-3">
           {navItems.map((item) => (
             <Button
               key={item.label}
@@ -382,6 +401,14 @@ function App() {
               {item.label}
             </Button>
           ))}
+          {serverVersion !== null && (
+            <p
+              className="text-muted-foreground mt-auto px-3 pt-4 text-xs"
+              title={serverVersion !== 'missing' && serverVersion.commit ? `Commit ${serverVersion.commit}` : undefined}
+            >
+              {serverVersion === 'missing' ? 'Server version unknown' : `Version ${serverVersion.version}`}
+            </p>
+          )}
         </aside>
 
         <main
