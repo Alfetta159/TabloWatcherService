@@ -11,7 +11,10 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/manual-recordings")]
-public class ManualRecordingsController(ICurrentTabloDeviceResolver deviceResolver, IAiringsStore airings) : ControllerBase
+public class ManualRecordingsController(
+    ICurrentTabloDeviceResolver deviceResolver,
+    IDeviceChannels deviceChannels,
+    IAiringsStore airings) : ControllerBase
 {
     private static readonly string[] DayNames =
         ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -60,8 +63,7 @@ public class ManualRecordingsController(ICurrentTabloDeviceResolver deviceResolv
                 return StatusCode(StatusCodes.Status502BadGateway);
             }
 
-            var channels = await BatchAsync<GuideChannel>(
-                client, programs.Values.Select(p => p.Config.ChannelPath).Distinct().ToArray()) ?? [];
+            var channels = await ChannelsByPathAsync();
 
             // Each one's next slot, if the guide cache has it yet - a just-created recording's
             // slots only show up there at the next guide refresh.
@@ -76,41 +78,6 @@ public class ManualRecordingsController(ICurrentTabloDeviceResolver deviceResolv
                     .OrderBy(p => p.Config.Title, StringComparer.CurrentCultureIgnoreCase)
                     .Select(p => Item(p, channels.GetValueOrDefault(p.Config.ChannelPath), nextAirings.GetValueOrDefault(p.Path))),
             });
-        }
-        catch (HttpRequestException)
-        {
-            return StatusCode(StatusCodes.Status502BadGateway);
-        }
-    }
-
-    /// <summary>The device's channels, by number - the Add dialog's Channel choices.</summary>
-    [HttpGet("channels")]
-    public async Task<IActionResult> GetChannels()
-    {
-        var client = await deviceResolver.ResolveAsync();
-        if (client is null)
-        {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
-        }
-
-        try
-        {
-            var pathsResponse = await client.GetGuideChannelsAsync();
-            if (!pathsResponse.IsSuccessStatusCode || pathsResponse.Content is null)
-            {
-                return pathsResponse.ToErrorResult();
-            }
-
-            var channels = await BatchAsync<GuideChannel>(client, pathsResponse.Content);
-            if (channels is null)
-            {
-                return StatusCode(StatusCodes.Status502BadGateway);
-            }
-
-            return Ok(channels.Values
-                .OrderBy(c => c.Channel.Major)
-                .ThenBy(c => c.Channel.Minor)
-                .Select(UpcomingResponses.Channel));
         }
         catch (HttpRequestException)
         {
@@ -175,8 +142,8 @@ public class ManualRecordingsController(ICurrentTabloDeviceResolver deviceResolv
                 return response.ToErrorResult();
             }
 
-            var channel = await BatchAsync<GuideChannel>(client, [response.Content.Config.ChannelPath]);
-            return Ok(Item(response.Content, channel?.GetValueOrDefault(response.Content.Config.ChannelPath), null));
+            var channels = await ChannelsByPathAsync();
+            return Ok(Item(response.Content, channels.GetValueOrDefault(response.Content.Config.ChannelPath), null));
         }
         catch (HttpRequestException)
         {
@@ -265,6 +232,11 @@ public class ManualRecordingsController(ICurrentTabloDeviceResolver deviceResolv
 
         return errors.Count == 0 ? null : errors;
     }
+
+    // The device's channels (see IDeviceChannels) by path, e.g. "/guide/channels/76404" -
+    // empty if they can't be read, which just leaves recordings without channel details.
+    private async Task<Dictionary<string, GuideChannel>> ChannelsByPathAsync() =>
+        (await deviceChannels.GetAsync())?.ToDictionary(c => c.Path) ?? [];
 
     private static async Task<Dictionary<string, T>?> BatchAsync<T>(ITabloDeviceClient client, string[] paths)
         where T : class

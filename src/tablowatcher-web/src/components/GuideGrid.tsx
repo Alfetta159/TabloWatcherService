@@ -224,19 +224,12 @@ function formatTick(date: Date): string {
   })
 }
 
-// One row per channel on the device, with whatever airings the guide has for it - so the
-// channels still show (and can be tuned) while the guide is loading or has no listings. Any
-// channel the guide has that the device's list doesn't (or isn't loaded yet) is kept too.
+// One row per channel on the device (its own channel list, never the guide's airings), with
+// whatever airings the guide has for it - so every channel shows, and can be tuned, while the
+// guide is loading or has no listings. No rows until that list has loaded.
 function gridRows(channels: GridChannelInfo[] | undefined, data: GuideGridResponse | null): GridChannel[] {
-  const gridChannels = data?.updatedAt ? data.channels : []
-  if (!channels?.length) return gridChannels
-
-  const airingsById = new Map(gridChannels.map((c) => [c.channel.objectId, c.airings]))
-  const listed = new Set(channels.map((c) => c.objectId))
-  return [
-    ...channels.map((channel) => ({ channel, airings: airingsById.get(channel.objectId) ?? [] })),
-    ...gridChannels.filter((c) => !listed.has(c.channel.objectId)),
-  ].sort((a, b) => a.channel.channel.major - b.channel.channel.major || a.channel.channel.minor - b.channel.channel.minor)
+  const airingsById = new Map((data?.updatedAt ? data.channels : []).map((c) => [c.channel.objectId, c.airings]))
+  return (channels ?? []).map((channel) => ({ channel, airings: airingsById.get(channel.objectId) ?? [] }))
 }
 
 interface GuideGridProps {
@@ -247,8 +240,7 @@ interface GuideGridProps {
   onWatchChannel?: (channel: WatchedChannel) => void
   // Channel object id -> the tuner last known to be showing it, shown on that channel's row.
   tunerByChannel?: Record<number, number>
-  // The device's channel list, loaded independently of airings - shown as the rows (with no
-  // programs) until the server has finished building the guide.
+  // The device's channel list, loaded independently of airings - the grid's rows.
   channels?: GridChannelInfo[]
 }
 

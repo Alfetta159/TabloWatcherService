@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { ScheduleStatus } from '@/components/Recording'
 import type { ChannelInfo } from '@/components/PosterGridPage'
+import { useDeviceChannels } from '@/hooks/useDeviceChannels'
 import { formatDuration } from '@/lib/format'
 import type { AiringSchedule } from '@/lib/recording'
 
@@ -178,8 +179,7 @@ function todayValue(): string {
 
 // Sets up a manual recording: repeating on chosen days, or just once on a date.
 function AddManualRecordingDialog({ onAdded }: { onAdded: () => void }) {
-  const [channels, setChannels] = useState<ChannelInfo[] | null>(null)
-  const [channelsError, setChannelsError] = useState<string | null>(null)
+  const { channels, error: channelsError } = useDeviceChannels()
   const [repeating, setRepeating] = useState(false)
   const [title, setTitle] = useState('')
   const [channelId, setChannelId] = useState('')
@@ -189,20 +189,6 @@ function AddManualRecordingDialog({ onAdded }: { onAdded: () => void }) {
   const [duration, setDuration] = useState('30')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/manual-recordings/channels')
-      .then(async (res) => {
-        if (!res.ok) throw new Error(await errorMessage(res))
-        return res.json() as Promise<ChannelInfo[]>
-      })
-      .then((c) => !cancelled && setChannels(c))
-      .catch((err) => !cancelled && setChannelsError(err.message))
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   function toggleDay(day: string, checked: boolean) {
     setDays((current) => {

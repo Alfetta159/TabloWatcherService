@@ -54,9 +54,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Settings', icon: Settings },
 ]
 
-// Pages listing what's in the guide - hidden while the Tablo has no listings (see
-// useGuideListings).
-const GUIDE_LISTING_NAV = new Set(['TV Shows', 'Movies', 'Sports'])
+// Pages built from the guide's listings - only shown once the Tablo has returned some (see
+// useGuideListings): hidden while the guide loads, and while it has none (no listings
+// subscription).
+const GUIDE_LISTING_NAV = new Set(['Search', 'TV Shows', 'Movies', 'Sports'])
 
 // Pages that use the whole width of the main area rather than a narrow centered column.
 const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports', 'Recordings', 'Manual', 'Search', 'Settings'])
@@ -143,7 +144,7 @@ function App() {
   const serverVersionMismatch =
     APP_VERSION !== undefined &&
     (serverVersion === 'missing' || (serverVersion !== null && serverVersion.version !== APP_VERSION))
-  const navItems = hasListings === false ? NAV_ITEMS.filter((item) => !GUIDE_LISTING_NAV.has(item.label)) : NAV_ITEMS
+  const navItems = hasListings === true ? NAV_ITEMS : NAV_ITEMS.filter((item) => !GUIDE_LISTING_NAV.has(item.label))
   const [channels, setChannels] = useState<GuideChannel[]>([])
   const [channelsLoading, setChannelsLoading] = useState(false)
   const [channelsError, setChannelsError] = useState<string | null>(null)

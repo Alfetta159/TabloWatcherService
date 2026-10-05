@@ -14,12 +14,26 @@ namespace TabloWatcherService.Api.Controllers;
 [Route("api/channels")]
 public class ChannelsController(
     ICurrentTabloDeviceResolver deviceResolver,
+    IDeviceChannels deviceChannels,
     IAiringsStore store,
     IRecordingsStore recordings,
     ILogger<ChannelsController> logger) : ControllerBase
 {
     // How many airings after the current one each channel lists.
     private const int UpNextCount = 3;
+
+    /// <summary>
+    /// Just the device's channels by number, for channel dropdowns - from the device's own
+    /// channel list (see <see cref="IDeviceChannels"/>), never the guide's airings.
+    /// </summary>
+    [HttpGet("list")]
+    public async Task<IActionResult> GetList(CancellationToken cancellationToken)
+    {
+        var channels = await deviceChannels.GetAsync(cancellationToken);
+        return channels is null
+            ? StatusCode(StatusCodes.Status502BadGateway)
+            : Ok(channels.Select(UpcomingResponses.Channel));
+    }
 
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken cancellationToken)
