@@ -442,8 +442,9 @@ src/tablowatcher-web/.vite/
 packaging/staging/
 packaging/dist/
 
-# Runtime state written next to the API (see BlockedTagsStore) - not source.
+# Runtime state written next to the API (see BlockedTagsStore, KeywordRulesStore) - not source.
 src/TabloWatcherService.Api/blocked-tags.json
+src/TabloWatcherService.Api/keyword-recordings.json
 
 # Dev-only guide/recordings cache (see DevCache) - never written outside Development.
 src/TabloWatcherService.Api/dev-guide-cache.json

@@ -75,6 +75,10 @@ builder.Services.AddHostedService<RecordingsRefreshService>();
 // Genre tags blocked for everyone, persisted to a small JSON file (see BlockedTagsStore).
 builder.Services.AddSingleton<IBlockedTagsStore, BlockedTagsStore>();
 
+// Keyword recordings, persisted the same way; AiringsRefreshService applies them after each refresh.
+builder.Services.AddSingleton<IKeywordRulesStore, KeywordRulesStore>();
+builder.Services.AddSingleton<KeywordRecordingService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

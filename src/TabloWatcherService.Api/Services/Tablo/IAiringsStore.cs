@@ -108,6 +108,12 @@ public interface IAiringsStore
     IReadOnlyList<AiringSearchResult> Search(string term, DateTime now);
 
     /// <summary>
+    /// Airings that haven't started by <paramref name="now"/> and meet every condition of a
+    /// keyword recording (see <see cref="KeywordCriteria"/>), soonest first.
+    /// </summary>
+    IReadOnlyList<Airing> FindKeywordMatches(KeywordCriteria criteria, DateTime now);
+
+    /// <summary>
     /// Series with airings that haven't ended by <paramref name="now"/>, sorted by title,
     /// each with the channels it's on sorted by soonest airing.
     /// </summary>

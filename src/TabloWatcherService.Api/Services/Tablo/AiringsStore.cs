@@ -205,6 +205,26 @@ public partial class AiringsStore : IAiringsStore
         return results;
     }
 
+    public IReadOnlyList<Airing> FindKeywordMatches(KeywordCriteria criteria, DateTime now)
+    {
+        var director = criteria.Director is { } d ? NormalizeWhitespace(d) : null;
+        var actor = criteria.Actor is { } a ? NormalizeWhitespace(a) : null;
+        var contains = criteria.DescriptionContains is { } c ? NormalizeWhitespace(c) : null;
+        var excludes = criteria.DescriptionExcludes is { } e ? NormalizeWhitespace(e) : null;
+
+        // Names match whole ("Tom Hanks", not "Tom"); description words at a word's start.
+        bool SameName(string name, string wanted) => Comparer.Compare(name, wanted, MatchOptions) == 0;
+
+        return _snapshot.SearchEntries
+            .Where(entry => entry.Airing.AiringDetails.Datetime > now
+                && (director is null || entry.Directors.Any(n => SameName(n.Normalized, director)))
+                && (actor is null || entry.Cast.Any(n => SameName(n.Normalized, actor)))
+                && (contains is null || entry.Descriptions.Any(text => ContainsAtWordStart(text, contains)))
+                && (excludes is null || !entry.Descriptions.Any(text => ContainsAtWordStart(text, excludes))))
+            .Select(entry => entry.Airing)
+            .ToList();
+    }
+
     public IReadOnlyList<UpcomingTitle<SeriesDetails>> GetUpcomingSeries(DateTime now) => Upcoming(_snapshot.Series, now);
 
     public IReadOnlyList<UpcomingTitle<MovieDetails>> GetUpcomingMovies(DateTime now) => Upcoming(_snapshot.Movies, now);

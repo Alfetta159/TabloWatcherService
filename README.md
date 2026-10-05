@@ -60,6 +60,15 @@ show and can be collapsed, with the matching words highlighted and badges for wh
 fields matched. Any airing can be set to record from the results, and clicking one opens
 its details - including copies you've already recorded - in a side panel.
 
+**Keyword recordings…** sets up recordings by what's in a listing: the director is someone,
+an actor is someone, and the description does or doesn't contain a word or phrase. Every
+condition you fill in has to match; for "or", make a second keyword recording. A live
+preview shows what it matches before you save. Once saved it records every matching
+upcoming airing, and checks again whenever the guide updates. A re-air of a movie or episode
+it's already recording is skipped, and so is anything already set to record. If you cancel
+one of its airings, it stays cancelled. Keyword recordings are saved on the server, and
+deleting one can also cancel the upcoming recordings it set up.
+
 ### TV Shows, Movies and Sports
 
 Posters for everything coming up in the guide, with the next airing, channels and genres.
@@ -437,6 +446,8 @@ server reports.
 | `GET /api/manual-recordings`, `/api/manual-recordings/channels` | Manual recordings; the channels one can be set on |
 | `POST /api/manual-recordings`, `DELETE /api/manual-recordings/{id}` | Set up a manual recording; cancel one |
 | `GET /api/search?q=`, `/api/search/details?path=` | Search the guide; full details for one result |
+| `GET /api/keyword-recordings`, `POST /api/keyword-recordings/preview` | Keyword recordings; what conditions would match |
+| `POST /api/keyword-recordings`, `DELETE /api/keyword-recordings/{id}?cancelScheduled=` | Save one (and record its matches); delete one |
 | `GET /api/tags?kind=`, `PUT /api/tags/blocked` | Tags for a page; set the excluded tags |
 | `GET /api/recordings`, `/api/recordings/scheduled` | Recordings as cards; upcoming recordings |
 | `GET /api/recordings/series/{id}`, `/programs/{id}`, `/movies/{id}`, `/sports/{eventId}` | One show's, movie's or sports event's recordings |
