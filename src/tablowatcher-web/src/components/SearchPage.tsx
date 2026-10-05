@@ -1,10 +1,12 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { ChevronDown, ChevronRight, LoaderCircle, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, LoaderCircle, Search, Sparkles } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { KeywordRecordingsDialog } from '@/components/KeywordRecordingsDialog'
 import { RecordButton, RecordingPill, ScheduleStatus } from '@/components/Recording'
 import { SearchDetailPanel } from '@/components/SearchDetailPanel'
 import { TagFilterControls } from '@/components/TagFilterControls'
@@ -160,6 +162,7 @@ export function SearchPage() {
   // Bumped each time the results are re-read, so the detail panel re-reads its result too.
   const [reloadToken, setReloadToken] = useState(0)
   const tagFilters = useTagFilters('search')
+  const [keywordsOpen, setKeywordsOpen] = useState(false)
 
   const groups = useMemo(() => {
     const allGroups = response ? groupByShow(response.results) : []
@@ -231,9 +234,19 @@ export function SearchPage() {
           </Button>
         </form>
 
-        <div className="flex flex-wrap items-end gap-4">
-          <TagFilterControls {...tagFilters} />
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-wrap items-end gap-4">
+            <TagFilterControls {...tagFilters} />
+          </div>
+          <Button variant="outline" onClick={() => setKeywordsOpen(true)}>
+            <Sparkles className="size-4" />
+            Keyword recordings…
+          </Button>
         </div>
+
+        <Dialog open={keywordsOpen} onOpenChange={setKeywordsOpen}>
+          {keywordsOpen && <KeywordRecordingsDialog onChanged={refreshResults} />}
+        </Dialog>
 
         {error && (
           <Alert variant="destructive">

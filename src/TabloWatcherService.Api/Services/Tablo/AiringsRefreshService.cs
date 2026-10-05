@@ -1,4 +1,5 @@
 using TabloWatcherService.Api.Models;
+using TabloWatcherService.Api.Services;
 
 namespace TabloWatcherService.Api.Services.Tablo;
 
@@ -13,6 +14,7 @@ namespace TabloWatcherService.Api.Services.Tablo;
 public class AiringsRefreshService(
     ICurrentTabloDeviceResolver deviceResolver,
     IAiringsStore store,
+    KeywordRecordingService keywordRecordings,
     IConfiguration configuration,
     ILogger<AiringsRefreshService> logger) : BackgroundService
 {
@@ -91,6 +93,18 @@ public class AiringsRefreshService(
             movies.Count,
             sports.Count,
             failedChunks + failedSeriesChunks + failedMovieChunks + failedSportChunks);
+
+        // New listings may match a keyword recording. Its own failures are retried at the next
+        // refresh; they don't make this one a failure.
+        try
+        {
+            await keywordRecordings.ApplyAsync(cancellationToken: cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Failed to apply keyword recordings");
+        }
+
         return true;
     }
 
