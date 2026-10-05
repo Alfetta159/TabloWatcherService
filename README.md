@@ -74,6 +74,10 @@ filter by tags. Click a poster for its details:
 
 Movies and sports events show whether they're scheduled or in conflict right on the poster.
 
+These three pages are hidden while the Tablo has no listings (for example, without a guide
+subscription) and come back by themselves once the server's regular guide refresh finds
+some.
+
 ### Tags
 
 Every page with a **Tags** filter can also **exclude** tags - genres you never want to
@@ -428,6 +432,7 @@ server reports.
 | `GET /api/movies`, `/api/movies/{movieId}` | Upcoming movies; one movie's details and airings |
 | `GET /api/sports` | Upcoming sports events |
 | `PUT /api/airings/schedule` | Record, or cancel recording, one airing |
+| `GET /api/guide/listings` | Whether the guide has listings (hides TV Shows, Movies and Sports when not) |
 | `GET /api/schedule?includeSkipped=` | Everything set to record, with conflicts |
 | `GET /api/manual-recordings`, `/api/manual-recordings/channels` | Manual recordings; the channels one can be set on |
 | `POST /api/manual-recordings`, `DELETE /api/manual-recordings/{id}` | Set up a manual recording; cancel one |

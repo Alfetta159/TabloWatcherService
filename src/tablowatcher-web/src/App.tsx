@@ -24,6 +24,7 @@ import { RecordButton } from '@/components/Recording'
 import { ResizableSplit } from '@/components/ResizableSplit'
 import { RecordingsPage } from '@/components/RecordingsPage'
 import { ManualPage } from '@/components/ManualPage'
+import { useGuideListings } from '@/hooks/useGuideListings'
 import { SearchPage } from '@/components/SearchPage'
 import { SettingsPage } from '@/components/SettingsPage'
 import { MoviesPage, SportsPage, TvShowsPage } from '@/components/UpcomingPages'
@@ -51,6 +52,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Manual', icon: CalendarClock },
   { label: 'Settings', icon: Settings },
 ]
+
+// Pages listing what's in the guide - hidden while the Tablo has no listings (see
+// useGuideListings).
+const GUIDE_LISTING_NAV = new Set(['TV Shows', 'Movies', 'Sports'])
 
 // Pages that use the whole width of the main area rather than a narrow centered column.
 const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports', 'Recordings', 'Manual', 'Search', 'Settings'])
@@ -127,6 +132,11 @@ function App() {
   const [serversError, setServersError] = useState<string | null>(null)
   const [selectedServerId, setSelectedServerId] = useState('')
   const [selectedNav, setSelectedNav] = useState<string>(NAV_ITEMS[0].label)
+  // Leaving a guide page for Live TV when it's hidden from under you.
+  const hasListings = useGuideListings(() =>
+    setSelectedNav((nav) => (GUIDE_LISTING_NAV.has(nav) ? NAV_ITEMS[0].label : nav)),
+  )
+  const navItems = hasListings === false ? NAV_ITEMS.filter((item) => !GUIDE_LISTING_NAV.has(item.label)) : NAV_ITEMS
   const [channels, setChannels] = useState<GuideChannel[]>([])
   const [channelsLoading, setChannelsLoading] = useState(false)
   const [channelsError, setChannelsError] = useState<string | null>(null)
@@ -361,7 +371,7 @@ function App() {
 
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-56 shrink-0 space-y-1 overflow-y-auto border-r p-3">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <Button
               key={item.label}
               variant={selectedNav === item.label ? 'secondary' : 'ghost'}

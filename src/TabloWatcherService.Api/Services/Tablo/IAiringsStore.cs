@@ -85,6 +85,13 @@ public interface IAiringsStore
 {
     DateTimeOffset? LastUpdated { get; }
 
+    /// <summary>
+    /// Whether the guide has any series, movie or sports airings - what the TV Shows, Movies
+    /// and Sports pages list. False when the device has no guide data (no listings
+    /// subscription), even if manual recordings give it airings of their own.
+    /// </summary>
+    bool HasListings { get; }
+
     /// <param name="airings">Every airing in the guide.</param>
     /// <param name="details">The series, movies and sports those airings belong to.</param>
     void Replace(IReadOnlyList<Airing> airings, GuideDetails details);

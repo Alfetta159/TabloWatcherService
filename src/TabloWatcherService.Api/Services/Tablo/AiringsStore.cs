@@ -76,6 +76,15 @@ public partial class AiringsStore : IAiringsStore
 
     public DateTimeOffset? LastUpdated { get; private set; }
 
+    public bool HasListings
+    {
+        get
+        {
+            var snapshot = _snapshot;
+            return snapshot.Series.Count > 0 || snapshot.Movies.Count > 0 || snapshot.SportsEvents.Count > 0;
+        }
+    }
+
     public void Replace(IReadOnlyList<Airing> airings, GuideDetails details)
     {
         BuildSnapshot(airings, details);
