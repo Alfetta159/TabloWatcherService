@@ -3,7 +3,7 @@ using TabloWatcherService.Api.Services.Tablo;
 namespace TabloWatcherService.Api.Controllers;
 
 /// <summary>
-/// The Scheduled page's data: every upcoming airing a recording covers, from the in-memory
+/// The Recordings page's Conflicts tab: every upcoming airing a recording covers, from the in-memory
 /// guide (<see cref="IAiringsStore"/>) - no device call per request. Recording and
 /// cancelling go through <see cref="AiringsController"/>.
 /// </summary>

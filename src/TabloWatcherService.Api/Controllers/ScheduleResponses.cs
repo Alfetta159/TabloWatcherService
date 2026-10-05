@@ -5,8 +5,8 @@ namespace TabloWatcherService.Api.Controllers;
 
 /// <summary>
 /// One upcoming airing covered by a recording (scheduled, in conflict or skipped), with what
-/// a card or row needs to show it - shared by the Recordings page's Scheduled tab and the
-/// Scheduled page.
+/// a card or row needs to show it - shared by the Recordings page's Scheduled and Conflicts
+/// tabs.
 /// </summary>
 internal static class ScheduleResponses
 {

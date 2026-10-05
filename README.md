@@ -34,12 +34,17 @@ Tablo DVR devices**, served from your own machine on your home network.
 
 ### Recordings
 
-- Everything recorded, as cards: one per TV show or program, and one per movie or sports
-  event. Tabs for **All**, **TV Shows**, **Movies**, **Sports** and **Scheduled** (what's
-  set to record next); sort by name or date recorded.
+- Everything recorded, as cards: one per TV show or manual recording, and one per movie or
+  sports event. Tabs for **All**, **TV Shows**, **Movies**, **Sports**, **Manual** (what
+  manual recordings have recorded), **Scheduled** (what's set to record next) and
+  **Conflicts**; sort by name or date recorded.
 - Cards show what's recording right now, how many recordings there are, how many are
   unwatched or failed, and how much space they use.
-- **TV shows and programs** open a dialog with every recording by season. Each one can be
+- **Conflicts:** everything set to record, by day or by show, filterable by kind and
+  channel. It opens on just the recordings that clash for lack of free tuners, to sort
+  them out; turn off **Conflicts only** for the full schedule. **Show skipped** also lists
+  airings that won't be recorded, and why (for example, already recorded).
+- **TV shows and manual recordings** open a dialog with every recording by season. Each one can be
   watched in place (resuming where you left off, or from the start), marked watched or
   unwatched, protected from being deleted automatically, or deleted. The **Delete** menu
   removes a whole season, everything watched, everything failed, or everything at once;
@@ -75,12 +80,14 @@ Every page with a **Tags** filter can also **exclude** tags - genres you never w
 see, say. Excluded tags apply everywhere (TV Shows, Movies, Sports and Search) and are
 saved on the server, so they stay excluded on every device you use.
 
-### Scheduled
+### Manual
 
-Everything set to record, by day or by show, filterable by kind and channel. A banner
-warns when two recordings clash for lack of free tuners, with a **Conflicts only** view to
-sort them out. **Show skipped** also lists airings that won't be recorded, and why (for
-example, already recorded).
+Record a channel at a set time, whatever the guide says is on - handy for local news or
+anything the guide gets wrong. **Add…** sets one up: a title, a channel, a start time and a
+duration in minutes, either **just once** on a date or **repeating** on any days of the
+week. Each manual recording is a card showing when it records and its next slot; click one
+to cancel it. What it has already recorded stays on the Recordings page's **Manual** tab.
+Times are in the Tablo's own time zone.
 
 ### Settings
 
@@ -422,6 +429,8 @@ server reports.
 | `GET /api/sports` | Upcoming sports events |
 | `PUT /api/airings/schedule` | Record, or cancel recording, one airing |
 | `GET /api/schedule?includeSkipped=` | Everything set to record, with conflicts |
+| `GET /api/manual-recordings`, `/api/manual-recordings/channels` | Manual recordings; the channels one can be set on |
+| `POST /api/manual-recordings`, `DELETE /api/manual-recordings/{id}` | Set up a manual recording; cancel one |
 | `GET /api/search?q=`, `/api/search/details?path=` | Search the guide; full details for one result |
 | `GET /api/tags?kind=`, `PUT /api/tags/blocked` | Tags for a page; set the excluded tags |
 | `GET /api/recordings`, `/api/recordings/scheduled` | Recordings as cards; upcoming recordings |

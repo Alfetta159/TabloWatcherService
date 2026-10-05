@@ -148,12 +148,13 @@ function ScheduleRow({
 }
 
 // Every upcoming airing a recording covers, grouped by day (or by show), with conflicts
-// called out and Record / Cancel on each.
-export function SchedulePage() {
+// called out and Record / Cancel on each - the Recordings page's Conflicts tab, which opens
+// on just the conflicts.
+export function SchedulePage({ initialConflictsOnly = false }: { initialConflictsOnly?: boolean }) {
   const [data, setData] = useState<ScheduleResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [includeSkipped, setIncludeSkipped] = useState(false)
-  const [conflictsOnly, setConflictsOnly] = useState(false)
+  const [conflictsOnly, setConflictsOnly] = useState(initialConflictsOnly)
   const [channelFilter, setChannelFilter] = useState(ALL_CHANNELS)
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [sortOrder, setSortOrder] = useState<SortOrder>('date')
@@ -231,7 +232,7 @@ export function SchedulePage() {
   const skippedCount = visible.length - scheduledCount
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="schedule-kind">Show</Label>
@@ -325,7 +326,9 @@ export function SchedulePage() {
       )}
 
       {data?.updatedAt && visible.length === 0 && (
-        <p className="text-muted-foreground text-sm">Nothing matches these filters.</p>
+        <p className="text-muted-foreground text-sm">
+          {conflictsOnly && data.conflictCount === 0 ? 'No recordings are in conflict.' : 'Nothing matches these filters.'}
+        </p>
       )}
 
       {groups.map((group) => (

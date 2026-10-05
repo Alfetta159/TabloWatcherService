@@ -23,7 +23,7 @@ import { LivePlayer } from '@/components/LivePlayer'
 import { RecordButton } from '@/components/Recording'
 import { ResizableSplit } from '@/components/ResizableSplit'
 import { RecordingsPage } from '@/components/RecordingsPage'
-import { SchedulePage } from '@/components/SchedulePage'
+import { ManualPage } from '@/components/ManualPage'
 import { SearchPage } from '@/components/SearchPage'
 import { SettingsPage } from '@/components/SettingsPage'
 import { MoviesPage, SportsPage, TvShowsPage } from '@/components/UpcomingPages'
@@ -48,12 +48,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'TV Shows', icon: MonitorPlay },
   { label: 'Movies', icon: Film },
   { label: 'Sports', icon: Trophy },
-  { label: 'Scheduled', icon: CalendarClock },
+  { label: 'Manual', icon: CalendarClock },
   { label: 'Settings', icon: Settings },
 ]
 
 // Pages that use the whole width of the main area rather than a narrow centered column.
-const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports', 'Recordings', 'Scheduled', 'Search', 'Settings'])
+const FULL_WIDTH_NAV = new Set(['Live TV', 'TV Shows', 'Movies', 'Sports', 'Recordings', 'Manual', 'Search', 'Settings'])
 
 interface ChannelDetails {
   callSign: string
@@ -506,8 +506,8 @@ function App() {
           <SportsPage />
         ) : selectedNav === 'Recordings' ? (
           <RecordingsPage />
-        ) : selectedNav === 'Scheduled' ? (
-          <SchedulePage />
+        ) : selectedNav === 'Manual' ? (
+          <ManualPage />
         ) : selectedNav === 'Settings' ? (
           <SettingsPage />
         ) : (

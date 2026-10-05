@@ -44,8 +44,22 @@ public interface ITabloDeviceClient
     [Get("/guide/channels/{channelId}")]
     Task<ApiResponse<GuideChannel>> GetGuideChannelAsync(int channelId);
 
-    [Get("/guide/program")]
+    // Manual recordings (see ManualProgram): paths like "/guide/programs/123".
+    [Get("/guide/programs")]
     Task<ApiResponse<string[]>> GetGuideProgramsAsync();
+
+    [Get("/guide/programs/{programId}")]
+    Task<ApiResponse<ManualProgram>> GetManualProgramAsync(int programId);
+
+    // Sets up a manual recording; answers with the whole new program. The device schedules
+    // every slot it covers itself.
+    [Post("/guide/programs")]
+    Task<ApiResponse<ManualProgram>> CreateManualProgramAsync([Body] CreateManualProgramRequest request);
+
+    // Cancels a manual recording and its upcoming slots; answers 204 No Content. What it
+    // already recorded stays.
+    [Delete("/guide/programs/{programId}")]
+    Task<IApiResponse> DeleteManualProgramAsync(int programId);
 
     [Get("/guide/movies")]
     Task<ApiResponse<string[]>> GetGuideMoviesAsync();
@@ -116,6 +130,9 @@ public interface ITabloDeviceClient
 
 // Body for ITabloDeviceClient.SetAiringScheduledAsync - serialized as {"scheduled": true}.
 public record ScheduleRequest(bool Scheduled);
+
+// Body for ITabloDeviceClient.CreateManualProgramAsync - {"config": {...}}.
+public record CreateManualProgramRequest(ManualProgramConfig Config);
 
 // Body for ITabloDeviceClient.UpdateRecordingAsync - only the fields being changed are sent,
 // e.g. {"watched": true}; the device leaves the others as they are.
