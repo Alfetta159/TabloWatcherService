@@ -6,6 +6,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { RecordingPill } from '@/components/Recording'
 import { TagFilterControls } from '@/components/TagFilterControls'
+import { useDeviceChannels } from '@/hooks/useDeviceChannels'
 import { useTagFilters } from '@/hooks/useTagFilters'
 import { compareTitles } from '@/lib/format'
 import type { RecordingState } from '@/lib/recording'
@@ -273,12 +274,8 @@ export function PosterGridPage<T>({
     return index === -1 ? null : (data?.items[index] ?? null)
   }, [cards, data, selectedKey])
 
-  // Every channel any card is coming up on, for the filter.
-  const channelOptions = useMemo(() => {
-    const byId = new Map<number, ChannelInfo>()
-    for (const card of cards) for (const c of card.channels) byId.set(c.objectId, c)
-    return [...byId.values()].sort((a, b) => a.major - b.major || a.minor - b.minor)
-  }, [cards])
+  // The filter offers every channel on the Tablo, not just ones with something coming up.
+  const channelOptions = useDeviceChannels().channels ?? []
 
   // Each facet's options: the values the cards actually have, sorted, with "no value" last.
   const facetOptions = useMemo(

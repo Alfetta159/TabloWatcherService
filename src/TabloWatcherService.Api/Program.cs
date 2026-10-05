@@ -60,6 +60,8 @@ builder.Services.AddSingleton<ITabloDeviceClientFactory>(serviceProvider =>
 // Resolves "the" Tablo device (the first the association server knows about) for
 // features scoped to a single device: the guide grid and its background images.
 builder.Services.AddSingleton<ICurrentTabloDeviceResolver, CurrentTabloDeviceResolver>();
+// Every channel list and dropdown reads the device's channels through this (cached briefly).
+builder.Services.AddSingleton<IDeviceChannels, DeviceChannels>();
 
 // Guide grid (channels x time): AiringsRefreshService periodically rebuilds this
 // in-memory store from the Tablo device; GuideGridController, SearchController and the

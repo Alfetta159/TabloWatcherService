@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { RecordButton, ScheduleStatus } from '@/components/Recording'
 import type { ChannelInfo } from '@/components/PosterGridPage'
+import { useDeviceChannels } from '@/hooks/useDeviceChannels'
 import { compareTitles } from '@/lib/format'
 import { isConflict, type AiringSchedule } from '@/lib/recording'
 
@@ -194,11 +195,8 @@ export function SchedulePage({ initialConflictsOnly = false }: { initialConflict
     }
   }, [includeSkipped, reloadToken])
 
-  const channelOptions = useMemo(() => {
-    const byId = new Map<number, ChannelInfo>()
-    for (const item of data?.items ?? []) byId.set(item.channel.objectId, item.channel)
-    return [...byId.values()].sort((a, b) => a.major - b.major || a.minor - b.minor)
-  }, [data])
+  // Every channel on the Tablo, not just ones with something set to record.
+  const channelOptions = useDeviceChannels().channels ?? []
 
   const visible = useMemo(
     () =>

@@ -83,9 +83,13 @@ filter by tags. Click a poster for its details:
 
 Movies and sports events show whether they're scheduled or in conflict right on the poster.
 
-These three pages are hidden while the Tablo has no listings (for example, without a guide
-subscription) and come back by themselves once the server's regular guide refresh finds
-some.
+Search, TV Shows, Movies and Sports only appear once the Tablo has returned listings: they're
+hidden while the guide first loads and whenever it has none (for example, without a guide
+subscription), and show up by themselves once the server's regular guide refresh finds some.
+
+Every channel list - the Live TV grid's rows, Settings → Channels and each **Channel**
+dropdown - comes from the Tablo's own channel list, so channels with nothing in the guide
+still appear.
 
 ### Tags
 
@@ -434,6 +438,7 @@ server reports.
 | --- | --- |
 | `GET /api/servers` | Tablo devices on your account, with their local IPs |
 | `GET /api/guide/grid?from=&to=` | Guide grid: channels with their airings in a time window |
+| `GET /api/channels/list` | The Tablo's channels by number, from its channel list (for dropdowns) |
 | `GET /api/channels` | Channels with guide and recording stats (Settings → Channels) |
 | `POST /api/watch/{channelId}` | Tune a channel; returns the HLS `playlistUrl` to play |
 | `GET /api/watch/{channelId}/tuner` | Which tuner a just-tuned channel landed on |
@@ -446,7 +451,7 @@ server reports.
 | `GET /api/version` | The server's version and commit |
 | `GET /api/guide/listings` | Whether the guide has listings (hides TV Shows, Movies and Sports when not) |
 | `GET /api/schedule?includeSkipped=` | Everything set to record, with conflicts |
-| `GET /api/manual-recordings`, `/api/manual-recordings/channels` | Manual recordings; the channels one can be set on |
+| `GET /api/manual-recordings` | Manual recordings |
 | `POST /api/manual-recordings`, `DELETE /api/manual-recordings/{id}` | Set up a manual recording; cancel one |
 | `GET /api/search?q=`, `/api/search/details?path=` | Search the guide; full details for one result |
 | `GET /api/keyword-recordings`, `POST /api/keyword-recordings/preview` | Keyword recordings; what conditions would match |
