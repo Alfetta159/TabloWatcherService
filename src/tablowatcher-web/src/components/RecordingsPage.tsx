@@ -161,7 +161,7 @@ function RecordingCard({
   description: string | null
   imageId: number | null
   pill: ReactNode
-  lines: string[]
+  lines: Array<string | ReactNode>
   genres: string[]
   // Makes the card clickable (and keyboard-activatable).
   onOpen?: () => void
@@ -204,8 +204,8 @@ function RecordingCard({
       <div className="space-y-1 p-3 text-sm">
         <p className="line-clamp-2 font-medium leading-snug">{title}</p>
         {subtitle && <p className="text-muted-foreground line-clamp-1 text-xs">{subtitle}</p>}
-        {lines.map((line) => (
-          <p key={line} className="text-muted-foreground text-xs">
+        {lines.map((line, index) => (
+          <p key={typeof line === 'string' ? line : index} className="text-muted-foreground text-xs">
             {line}
           </p>
         ))}
@@ -233,7 +233,7 @@ function RecordingNowPill() {
   )
 }
 
-function recordedLines(group: RecordingGroup): string[] {
+function recordedLines(group: RecordingGroup): Array<string | ReactNode> {
   // Counted for series and programs - and for a movie recorded more than once.
   const grouped = group.kind === 'tv' || group.kind === 'program' || group.recordingCount > 1
   return [
@@ -242,7 +242,7 @@ function recordedLines(group: RecordingGroup): string[] {
       ? `${group.recordingCount} recording${group.recordingCount === 1 ? '' : 's'}` +
         (group.unwatchedCount > 0 ? ` · ${group.unwatchedCount} unwatched` : '')
       : group.unwatchedCount > 0
-        ? 'Unwatched'
+        ? <span className="text-black font-bold">Unwatched</span>
         : 'Watched',
     formatSize(group.totalSize) + (group.failedCount > 0 ? ` · ${group.failedCount} failed` : ''),
   ]

@@ -510,10 +510,17 @@ function RecordingRow({
                 `${r.channel.major}.${r.channel.minor} ${r.channel.callSign}`,
                 r.duration > 0 ? formatDuration(r.duration) : null,
                 formatSize(r.size),
-                r.watched ? 'Watched' : resumePosition(r) > 0 ? `Stopped at ${formatClock(r.position)}` : 'Unwatched',
+                r.watched ? 'Watched' : resumePosition(r) > 0 ? `Stopped at ${formatClock(r.position)}` : (
+                  <span className="text-black font-bold">Unwatched</span>
+                ),
               ]
                 .filter(Boolean)
-                .join(' · ')}
+                .map((item, index, array) => (
+                  <span key={`${r.path}-${index}`}>
+                    {item}
+                    {index < array.length - 1 && <span className="text-muted-foreground"> · </span>}
+                  </span>
+                ))}
             </span>
             {r.protected && <Badge variant="secondary">Protected</Badge>}
             {inProgress && <Badge variant="destructive">Recording</Badge>}
