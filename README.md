@@ -161,6 +161,20 @@ it which one yours is based on. Zorin 18 is based on Ubuntu 24.04:
 curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/setup.deb.sh' | distro=ubuntu version=24.04 codename=noble sudo -E bash
 ```
 
+To add the repository to apt by hand instead of running the script, install its signing key
+and source list yourself. Change `distro` and `codename` to match your system (or the
+release yours is based on):
+
+```bash
+curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/gpg.key' \
+  | sudo gpg --dearmor -o /usr/share/keyrings/alfetta159-tablo-watcher-service-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/config.deb.txt?distro=ubuntu&codename=noble' \
+  | sudo tee /etc/apt/sources.list.d/alfetta159-tablo-watcher-service.list
+sudo apt update && sudo apt install tabloid
+```
+
+To remove the repository again, delete those two files and run `sudo apt update`.
+
 #### From a downloaded file
 
 Or download the package for your system from the
