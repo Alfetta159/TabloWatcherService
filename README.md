@@ -129,7 +129,41 @@ Times are in the Tablo's own time zone.
 
 ### Installing on Linux
 
-Download the package for your system from the
+#### From the package repository (recommended)
+
+Packages are published to [Cloudsmith](https://cloudsmith.io/~alfetta159/repos/tablo-watcher-service/),
+so your package manager can install and update Tabloid. Add the repository once:
+
+```bash
+# Debian, Ubuntu, Mint, Raspberry Pi OS
+curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/setup.deb.sh' | sudo -E bash
+```
+
+```bash
+# Fedora, openSUSE
+curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/setup.rpm.sh' | sudo -E bash
+```
+
+Then install it:
+
+```bash
+sudo apt update && sudo apt install tabloid
+```
+
+```bash
+sudo dnf install tabloid
+```
+
+If the setup script says it doesn't support your distribution (for example Zorin OS), tell
+it which one yours is based on. Zorin 18 is based on Ubuntu 24.04:
+
+```bash
+curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/setup.deb.sh' | distro=ubuntu version=24.04 codename=noble sudo -E bash
+```
+
+#### From a downloaded file
+
+Or download the package for your system from the
 [Releases](https://github.com/Alfetta159/TabloWatcherService/releases) page: `.deb` for
 Debian, Ubuntu, Mint and Raspberry Pi OS; `.rpm` for Fedora and openSUSE. Pick `amd64` /
 `x86_64` for a typical PC, or `arm64` / `aarch64` for a 64-bit Raspberry Pi. Then install
@@ -146,8 +180,10 @@ sudo dnf install ./tabloid-<version>-1.x86_64.rpm
 This installs the app to `/opt/tablowatcherservice` and starts it as the
 `tablowatcherservice` service, which also starts at boot.
 
-**Updating:** download the newer package from the Releases page and install it the same
-way. It upgrades in place and keeps your settings.
+**Updating:** with the repository added, `sudo apt update && sudo apt upgrade` (or `sudo dnf
+upgrade`) picks up new versions. With a downloaded file, download the newer package from the
+Releases page and install it the same way. Either way it upgrades in place and keeps your
+settings.
 
 **Uninstalling:** `sudo apt remove tabloid` or `sudo dnf remove
 tabloid`. Your settings stay in `/opt/tablowatcherservice` in case you
