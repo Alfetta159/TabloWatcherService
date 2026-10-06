@@ -1,7 +1,14 @@
 # nFPM config for the .deb and .rpm packages - see packaging/build-packages.sh, which sets
 # ARCH/VERSION and stages the self-contained publish output before running nfpm from this
 # directory (the relative `src` paths below are resolved against it).
-name: tablowatcherservice
+name: tabloid
+# Preview releases shipped as "tablowatcherservice"; upgrade them in place.
+replaces:
+  - tablowatcherservice
+conflicts:
+  - tablowatcherservice
+provides:
+  - tablowatcherservice
 arch: ${ARCH}
 platform: linux
 # A semver pre-release such as 0.1.0-preview1 becomes 0.1.0~preview1 in both formats, which

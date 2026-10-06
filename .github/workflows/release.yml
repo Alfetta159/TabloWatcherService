@@ -4,6 +4,8 @@
 #   git tag v0.1.0-preview1 && git push origin v0.1.0-preview1
 #
 # A tag with a pre-release suffix (anything after a "-") becomes a GitHub pre-release.
+# The .deb and .rpm packages are also pushed to Cloudsmith (alfetta159/tablo-watcher-service),
+# authenticated with the CLOUDSMITH_API_KEY repository secret.
 name: Release
 
 on:
@@ -59,3 +61,16 @@ jobs:
           notes="$(sed "s/@VERSION@/${GITHUB_REF_NAME#v}/g" packaging/release-notes.md)"
           gh release create "$GITHUB_REF_NAME" packaging/dist/* \
             --title "$GITHUB_REF_NAME" --notes "$notes" --generate-notes "${prerelease[@]}"
+
+      - name: Publish to Cloudsmith
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+          CLOUDSMITH_REPO: alfetta159/tablo-watcher-service
+        run: |
+          pipx install cloudsmith-cli
+          for f in packaging/dist/*.deb; do
+            cloudsmith push deb "$CLOUDSMITH_REPO/any-distro/any-version" "$f" --republish
+          done
+          for f in packaging/dist/*.rpm; do
+            cloudsmith push rpm "$CLOUDSMITH_REPO/any-distro/any-version" "$f" --republish
+          done

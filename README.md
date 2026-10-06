@@ -136,11 +136,11 @@ Debian, Ubuntu, Mint and Raspberry Pi OS; `.rpm` for Fedora and openSUSE. Pick `
 it from the folder you downloaded it to (keep the `./`):
 
 ```bash
-sudo apt install ./tablowatcherservice_<version>_amd64.deb
+sudo apt install ./tabloid_<version>_amd64.deb
 ```
 
 ```bash
-sudo dnf install ./tablowatcherservice-<version>-1.x86_64.rpm
+sudo dnf install ./tabloid-<version>-1.x86_64.rpm
 ```
 
 This installs the app to `/opt/tablowatcherservice` and starts it as the
@@ -149,9 +149,9 @@ This installs the app to `/opt/tablowatcherservice` and starts it as the
 **Updating:** download the newer package from the Releases page and install it the same
 way. It upgrades in place and keeps your settings.
 
-**Uninstalling:** `sudo apt remove tablowatcherservice` or `sudo dnf remove
-tablowatcherservice`. Your settings stay in `/opt/tablowatcherservice` in case you
-reinstall; `sudo apt purge tablowatcherservice` removes them too.
+**Uninstalling:** `sudo apt remove tabloid` or `sudo dnf remove
+tabloid`. Your settings stay in `/opt/tablowatcherservice` in case you
+reinstall; `sudo apt purge tabloid` removes them too.
 
 If you previously installed with `deploy/install.sh`, the package moves the unit file that
 script installed aside (to `/etc/systemd/system/tablowatcherservice.service.from-install-sh`),
@@ -327,6 +327,11 @@ tag's version) above the generated list of changes. A tag with a `-` suffix (lik
 git tag v0.1.0-preview1
 git push origin v0.1.0-preview1
 ```
+
+The workflow also pushes the `.deb` and `.rpm` packages to the
+[Cloudsmith](https://cloudsmith.io/~alfetta159/repos/tablo-watcher-service/) repository
+`alfetta159/tablo-watcher-service`. It authenticates with a `CLOUDSMITH_API_KEY` repository
+secret (Settings → Secrets and variables → Actions), which must be set before tagging.
 
 ### Running as a service
 
