@@ -21,13 +21,46 @@ public class KeywordRecordingsController(
 
     private const int MaxFieldLength = 100;
 
-    public record CriteriaRequest(string? Director, string? Actor, string? DescriptionContains, string? DescriptionExcludes)
+    public record CriteriaRequest(
+        string? Director,
+        string? Actor,
+        string? TitleContains,
+        string? TitleExcludes,
+        string? PlotContains,
+        string? PlotExcludes,
+        string? DescriptionContains,
+        string? DescriptionExcludes)
     {
-        public KeywordCriteria ToCriteria() => new KeywordCriteria(Director, Actor, DescriptionContains, DescriptionExcludes).Trimmed();
+        public KeywordCriteria ToCriteria() => new KeywordCriteria(
+            Director,
+            Actor,
+            TitleContains,
+            TitleExcludes,
+            PlotContains,
+            PlotExcludes,
+            DescriptionContains,
+            DescriptionExcludes).Trimmed();
     }
 
-    public record CreateRequest(string? Name, string? Director, string? Actor, string? DescriptionContains, string? DescriptionExcludes)
-        : CriteriaRequest(Director, Actor, DescriptionContains, DescriptionExcludes);
+    public record CreateRequest(
+        string? Name,
+        string? Director,
+        string? Actor,
+        string? TitleContains,
+        string? TitleExcludes,
+        string? PlotContains,
+        string? PlotExcludes,
+        string? DescriptionContains,
+        string? DescriptionExcludes)
+        : CriteriaRequest(
+            Director,
+            Actor,
+            TitleContains,
+            TitleExcludes,
+            PlotContains,
+            PlotExcludes,
+            DescriptionContains,
+            DescriptionExcludes);
 
     [HttpGet]
     public IActionResult Get() => Ok(new
@@ -103,6 +136,10 @@ public class KeywordRecordingsController(
             name = rule.Name,
             director = rule.Criteria.Director,
             actor = rule.Criteria.Actor,
+            titleContains = rule.Criteria.TitleContains,
+            titleExcludes = rule.Criteria.TitleExcludes,
+            plotContains = rule.Criteria.PlotContains,
+            plotExcludes = rule.Criteria.PlotExcludes,
             descriptionContains = rule.Criteria.DescriptionContains,
             descriptionExcludes = rule.Criteria.DescriptionExcludes,
             createdAt = rule.CreatedAt,
@@ -129,13 +166,17 @@ public class KeywordRecordingsController(
         var errors = new Dictionary<string, string[]>();
         if (!criteria.HasPositiveCondition)
         {
-            errors[nameof(criteria.Director)] = ["Enter a director, an actor or words the description contains."];
+            errors[nameof(criteria.Director)] = ["Enter a director, an actor, a title, a plot or words the description contains."];
         }
 
         foreach (var (field, value) in new[]
         {
             (nameof(criteria.Director), criteria.Director),
             (nameof(criteria.Actor), criteria.Actor),
+            (nameof(criteria.TitleContains), criteria.TitleContains),
+            (nameof(criteria.TitleExcludes), criteria.TitleExcludes),
+            (nameof(criteria.PlotContains), criteria.PlotContains),
+            (nameof(criteria.PlotExcludes), criteria.PlotExcludes),
             (nameof(criteria.DescriptionContains), criteria.DescriptionContains),
             (nameof(criteria.DescriptionExcludes), criteria.DescriptionExcludes),
         })
@@ -155,7 +196,11 @@ public class KeywordRecordingsController(
         {
             criteria.Director is { } director ? $"Directed by {director}" : null,
             criteria.Actor is { } actor ? $"With {actor}" : null,
-            criteria.DescriptionContains is { } contains ? $"“{contains}”" : null,
-            criteria.DescriptionExcludes is { } excludes ? $"not “{excludes}”" : null,
+            criteria.TitleContains is { } contains ? $"Title has “{contains}”" : null,
+            criteria.TitleExcludes is { } excludes ? $"Title not “{excludes}”" : null,
+            criteria.PlotContains is { } plotContains ? $"Plot has “{plotContains}”" : null,
+            criteria.PlotExcludes is { } plotExcludes ? $"Plot not “{plotExcludes}”" : null,
+            criteria.DescriptionContains is { } descriptionContains ? $"Description has “{descriptionContains}”" : null,
+            criteria.DescriptionExcludes is { } descriptionExcludes ? $"Description not “{descriptionExcludes}”" : null,
         }.OfType<string>());
 }

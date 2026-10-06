@@ -209,16 +209,24 @@ public partial class AiringsStore : IAiringsStore
     {
         var director = criteria.Director is { } d ? NormalizeWhitespace(d) : null;
         var actor = criteria.Actor is { } a ? NormalizeWhitespace(a) : null;
+        var titleContains = criteria.TitleContains is { } titleContainsValue ? NormalizeWhitespace(titleContainsValue) : null;
+        var titleExcludes = criteria.TitleExcludes is { } titleExcludesValue ? NormalizeWhitespace(titleExcludesValue) : null;
+        var plotContains = criteria.PlotContains is { } plotContainsValue ? NormalizeWhitespace(plotContainsValue) : null;
+        var plotExcludes = criteria.PlotExcludes is { } plotExcludesValue ? NormalizeWhitespace(plotExcludesValue) : null;
         var contains = criteria.DescriptionContains is { } c ? NormalizeWhitespace(c) : null;
         var excludes = criteria.DescriptionExcludes is { } e ? NormalizeWhitespace(e) : null;
 
-        // Names match whole ("Tom Hanks", not "Tom"); description words at a word's start.
+        // Names match whole ("Tom Hanks", not "Tom"); title/plot words at a word's start.
         bool SameName(string name, string wanted) => Comparer.Compare(name, wanted, MatchOptions) == 0;
 
         return _snapshot.SearchEntries
             .Where(entry => entry.Airing.AiringDetails.Datetime > now
                 && (director is null || entry.Directors.Any(n => SameName(n.Normalized, director)))
                 && (actor is null || entry.Cast.Any(n => SameName(n.Normalized, actor)))
+                && (titleContains is null || entry.Titles.Any(text => ContainsAtWordStart(text, titleContains)))
+                && (titleExcludes is null || !entry.Titles.Any(text => ContainsAtWordStart(text, titleExcludes)))
+                && (plotContains is null || entry.Descriptions.Any(text => ContainsAtWordStart(text, plotContains)))
+                && (plotExcludes is null || !entry.Descriptions.Any(text => ContainsAtWordStart(text, plotExcludes)))
                 && (contains is null || entry.Descriptions.Any(text => ContainsAtWordStart(text, contains)))
                 && (excludes is null || !entry.Descriptions.Any(text => ContainsAtWordStart(text, excludes))))
             .Select(entry => entry.Airing)

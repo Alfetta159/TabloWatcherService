@@ -15,6 +15,10 @@ interface KeywordRecording {
   name: string
   director: string | null
   actor: string | null
+  titleContains: string | null
+  titleExcludes: string | null
+  plotContains: string | null
+  plotExcludes: string | null
   descriptionContains: string | null
   descriptionExcludes: string | null
   createdAt: string
@@ -37,22 +41,44 @@ interface MatchItem {
 interface Criteria {
   director: string
   actor: string
+  titleContains: string
+  titleExcludes: string
+  plotContains: string
+  plotExcludes: string
   descriptionContains: string
   descriptionExcludes: string
 }
 
-const EMPTY_CRITERIA: Criteria = { director: '', actor: '', descriptionContains: '', descriptionExcludes: '' }
+const EMPTY_CRITERIA: Criteria = {
+  director: '',
+  actor: '',
+  titleContains: '',
+  titleExcludes: '',
+  plotContains: '',
+  plotExcludes: '',
+  descriptionContains: '',
+  descriptionExcludes: '',
+}
 
 // Same rule as the server: something to look for, not just something to leave out.
 function hasPositiveCondition(c: Criteria): boolean {
-  return [c.director, c.actor, c.descriptionContains].some((v) => v.trim() !== '')
+  return [c.director, c.actor, c.titleContains, c.plotContains, c.descriptionContains].some((v) => v.trim() !== '')
 }
 
-// e.g. "Director is Ridley Scott · Actor is Sigourney Weaver · Description has “alien”".
-function describeConditions(r: Pick<KeywordRecording, 'director' | 'actor' | 'descriptionContains' | 'descriptionExcludes'>): string {
+// e.g. "Director is Ridley Scott · Actor is Sigourney Weaver · Title has “alien”".
+function describeConditions(
+  r: Pick<
+    KeywordRecording,
+    'director' | 'actor' | 'titleContains' | 'titleExcludes' | 'plotContains' | 'plotExcludes' | 'descriptionContains' | 'descriptionExcludes'
+  >,
+): string {
   return [
     r.director && `Director is ${r.director}`,
     r.actor && `Actor is ${r.actor}`,
+    r.titleContains && `Title has “${r.titleContains}”`,
+    r.titleExcludes && `Title doesn't have “${r.titleExcludes}”`,
+    r.plotContains && `Plot has “${r.plotContains}”`,
+    r.plotExcludes && `Plot doesn't have “${r.plotExcludes}”`,
     r.descriptionContains && `Description has “${r.descriptionContains}”`,
     r.descriptionExcludes && `Description doesn't have “${r.descriptionExcludes}”`,
   ]
@@ -160,8 +186,7 @@ function NewKeywordRecording({ onSaved, onBack }: { onSaved: (scheduled: number)
         <div className="space-y-1">
           <DialogTitle className="text-lg leading-tight font-semibold">New keyword recording</DialogTitle>
           <DialogDescription>
-            Records every upcoming airing that meets all of these, now and whenever the guide updates. For “or”, make a
-            second one.
+            Records every upcoming airing that meets all of these, now and whenever the guide updates.
           </DialogDescription>
         </div>
       </div>
@@ -174,6 +199,22 @@ function NewKeywordRecording({ onSaved, onBack }: { onSaved: (scheduled: number)
         <div className="space-y-1.5">
           <Label htmlFor="keyword-actor">An actor is</Label>
           <Input {...field('actor')} placeholder="Full name" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="keyword-titleContains">Title contains</Label>
+          <Input {...field('titleContains')} placeholder="A word or phrase" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="keyword-titleExcludes">Title doesn't contain</Label>
+          <Input {...field('titleExcludes')} placeholder="A word or phrase" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="keyword-plotContains">Plot contains</Label>
+          <Input {...field('plotContains')} placeholder="A word or phrase" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="keyword-plotExcludes">Plot doesn't contain</Label>
+          <Input {...field('plotExcludes')} placeholder="A word or phrase" />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="keyword-descriptionContains">Description contains</Label>
@@ -198,7 +239,9 @@ function NewKeywordRecording({ onSaved, onBack }: { onSaved: (scheduled: number)
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-md border p-3 text-sm">
         {!ready ? (
-          <p className="text-muted-foreground">Enter a director, an actor or words the description contains to see what it matches.</p>
+          <p className="text-muted-foreground">
+            Enter a director, an actor, a title, a plot or words the description contains to see what it matches.
+          </p>
         ) : !preview ? (
           <p className="text-muted-foreground flex items-center gap-2">
             <LoaderCircle className="size-4 animate-spin" /> Checking the guide…
