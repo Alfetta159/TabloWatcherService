@@ -6,6 +6,8 @@ interface LivePlayerProps {
   playlistUrl: string | null
   // Set once a channel has been picked (e.g. "3.2 Me-TV M*A*S*H"); shown until playback starts.
   tuningLabel: string | null
+  mediaTitle?: string | null
+  mediaSubtitle?: string | null
   tuneError?: string | null
   className?: string
   // Also plays recordings (see RecordingPlayerDialog), which need different wording and can
@@ -30,6 +32,9 @@ interface AudioSettings {
   volume: number
   muted: boolean
 }
+
+const SEEK_BACKWARD_SECONDS = 10
+const SEEK_FORWARD_SECONDS = 30
 
 // The player remounts on every channel change (see App), so the user's volume/mute choice is
 // kept here - and in localStorage, so it survives reloads too. Starts muted, like before.
@@ -57,6 +62,27 @@ function saveAudioSettings(video: HTMLVideoElement) {
   }
 }
 
+function seekTo(video: HTMLVideoElement, time: number) {
+  if (video.seekable.length > 0) {
+    const last = video.seekable.length - 1
+    const start = video.seekable.start(0)
+    const end = video.seekable.end(last)
+    video.currentTime = Math.min(Math.max(time, start), end)
+    return
+  }
+
+  if (Number.isFinite(video.duration)) {
+    video.currentTime = Math.min(Math.max(time, 0), video.duration)
+    return
+  }
+
+  video.currentTime = Math.max(time, 0)
+}
+
+function seekBy(video: HTMLVideoElement, offsetSeconds: number) {
+  seekTo(video, video.currentTime + offsetSeconds)
+}
+
 // Unmuted autoplay can be refused (browser autoplay policy); fall back to muted rather than
 // not playing at all.
 function play(video: HTMLVideoElement) {
@@ -72,6 +98,7 @@ function play(video: HTMLVideoElement) {
 // there: its video is moved out of the page, still in the document so the browser doesn't
 // pause it, and torn down once picture-in-picture is closed or another player starts.
 let detached: { video: HTMLVideoElement; teardown: () => void } | null = null
+const mediaSessionTeardowns = new WeakMap<HTMLVideoElement, () => void>()
 
 function keepPlayingDetached(video: HTMLVideoElement, teardown: () => void) {
   endDetached()
@@ -88,6 +115,8 @@ function endDetached() {
   const { video, teardown } = detached
   detached = null
   if (document.pictureInPictureElement === video) document.exitPictureInPicture().catch(() => {})
+  mediaSessionTeardowns.get(video)?.()
+  mediaSessionTeardowns.delete(video)
   teardown()
   video.remove()
 }
@@ -95,6 +124,8 @@ function endDetached() {
 export function LivePlayer({
   playlistUrl,
   tuningLabel,
+  mediaTitle,
+  mediaSubtitle,
   tuneError,
   className,
   startAt,
@@ -104,6 +135,7 @@ export function LivePlayer({
   // The <video> is created here rather than rendered, so it can outlive this component in
   // picture-in-picture (see keepPlayingDetached).
   const hostRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
 
@@ -124,10 +156,12 @@ export function LivePlayer({
     video.muted = audioSettings.muted
     video.addEventListener('playing', () => setPlaying(true))
     video.addEventListener('volumechange', () => saveAudioSettings(video))
+    videoRef.current = video
     host.appendChild(video)
 
     const teardown = attachStream(video, playlistUrl, startAt, setError)
     return () => {
+      videoRef.current = null
       if (document.pictureInPictureElement === video) {
         keepPlayingDetached(video, teardown)
       } else {
@@ -136,6 +170,51 @@ export function LivePlayer({
       }
     }
   }, [playlistUrl, startAt])
+
+  useLayoutEffect(() => {
+    const video = videoRef.current
+    if (!video || !navigator.mediaSession) return
+
+    const session = navigator.mediaSession
+    const onPlaybackChange = () => {
+      session.playbackState = video.paused ? 'paused' : 'playing'
+    }
+    const onPlay = () => play(video)
+    const onPause = () => video.pause()
+    const onSeekBackward = () => seekBy(video, -SEEK_BACKWARD_SECONDS)
+    const onSeekForward = () => seekBy(video, SEEK_FORWARD_SECONDS)
+
+    session.setActionHandler('play', onPlay)
+    session.setActionHandler('pause', onPause)
+    session.setActionHandler('seekbackward', onSeekBackward)
+    session.setActionHandler('seekforward', onSeekForward)
+    if (typeof MediaMetadata !== 'undefined') {
+      session.metadata = new MediaMetadata({
+        title: mediaTitle ?? tuningLabel ?? 'TabloWatcher',
+        ...(mediaSubtitle ? { artist: mediaSubtitle } : {}),
+      })
+    }
+    video.addEventListener('play', onPlaybackChange)
+    video.addEventListener('pause', onPlaybackChange)
+    onPlaybackChange()
+
+    const teardown = () => {
+      video.removeEventListener('play', onPlaybackChange)
+      video.removeEventListener('pause', onPlaybackChange)
+      session.setActionHandler('play', null)
+      session.setActionHandler('pause', null)
+      session.setActionHandler('seekbackward', null)
+      session.setActionHandler('seekforward', null)
+      session.metadata = null
+      session.playbackState = 'none'
+    }
+    mediaSessionTeardowns.set(video, teardown)
+    return () => {
+      if (document.pictureInPictureElement === video || detached?.video === video) return
+      mediaSessionTeardowns.delete(video)
+      teardown()
+    }
+  }, [mediaTitle, mediaSubtitle, playlistUrl, startAt, tuningLabel])
 
   if (!tuningLabel) {
     return (
