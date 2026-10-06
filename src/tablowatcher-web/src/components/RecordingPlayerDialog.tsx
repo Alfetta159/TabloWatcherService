@@ -316,11 +316,18 @@ export function RecordingPlayerDialog({
                           r.duration > 0 ? formatDuration(r.duration) : null,
                           formatSize(r.size),
                           r.height > 0 ? `${r.height}p` : null,
-                          r.watched ? 'Watched' : r.position > 30 ? `Stopped at ${formatClock(r.position)}` : 'Unwatched',
+                          r.watched ? 'Watched' : r.position > 30 ? `Stopped at ${formatClock(r.position)}` : (
+                            <span key="status" className="text-black font-bold">Unwatched</span>
+                          ),
                           r.state && r.state !== 'finished' ? r.state : null,
                         ]
                           .filter(Boolean)
-                          .join(' · ')}
+                          .map((item, index, array) => (
+                            <span key={`${r.path}-${index}`}>
+                              {item}
+                              {index < array.length - 1 && <span className="text-muted-foreground"> · </span>}
+                            </span>
+                          ))}
                       </p>
                     </button>
                   )
