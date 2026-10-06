@@ -61,13 +61,13 @@ fields matched. Any airing can be set to record from the results, and clicking o
 its details - including copies you've already recorded - in a side panel.
 
 **Keyword recordings…** sets up recordings by what's in a listing: the director is someone,
-an actor is someone, and the description does or doesn't contain a word or phrase. Every
-condition you fill in has to match; for "or", make a second keyword recording. A live
-preview shows what it matches before you save. Once saved it records every matching
-upcoming airing, and checks again whenever the guide updates. A re-air of a movie or episode
-it's already recording is skipped, and so is anything already set to record. If you cancel
-one of its airings, it stays cancelled. Keyword recordings are saved on the server, and
-deleting one can also cancel the upcoming recordings it set up.
+an actor is someone, the title or plot does or doesn't contain a word or phrase, and the
+description does or doesn't contain a word or phrase. Every condition you fill in has to
+match. A live preview shows what it matches before you save. Once saved it records every
+matching upcoming airing, and checks again whenever the guide updates. A re-air of a movie
+or episode it's already recording is skipped, and so is anything already set to record. If
+you cancel one of its airings, it stays cancelled. Keyword recordings are saved on the
+server, and deleting one can also cancel the upcoming recordings it set up.
 
 ### TV Shows, Movies and Sports
 
