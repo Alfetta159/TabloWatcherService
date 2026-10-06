@@ -302,6 +302,11 @@ git tag v0.1.0-preview1
 git push origin v0.1.0-preview1
 ```
 
+The workflow also pushes the `.deb` and `.rpm` packages to the
+[Cloudsmith](https://cloudsmith.io/~alfetta159/repos/tablo-watcher-service/) repository
+`alfetta159/tablo-watcher-service`. It authenticates with a `CLOUDSMITH_API_KEY` repository
+secret (Settings → Secrets and variables → Actions), which must be set before tagging.
+
 ### Running as a service
 
 #### Linux (systemd)
