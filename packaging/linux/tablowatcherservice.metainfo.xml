@@ -8,8 +8,8 @@
 -->
 <component type="desktop-application">
   <id>io.github.alfetta159.TabloWatcherService</id>
-  <name>Tablo Watcher</name>
-  <summary>Watch and configure recordings on your Tablo DVR</summary>
+  <name>Tabloid</name>
+  <summary>Watch and configure recordings on your legacyTablo DVR</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <developer id="io.github.alfetta159">
@@ -21,6 +21,11 @@
       Watch live TV, browse the guide and manage recordings on a legacy Tablo DVR, from any
       browser on your home network. Tablo Watcher runs in the background on this computer;
       opening it from the app menu opens it in your browser.
+    </p>
+    <p>
+      <i>
+      Note that this application is intended for use with legacy Tablo DVRs and may not support newer models.
+      </i>
     </p>
     <ul>
       <li>A channels-by-time guide grid, with live TV playing in the browser</li>
