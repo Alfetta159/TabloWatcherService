@@ -112,11 +112,11 @@ Debian, Ubuntu, Mint and Raspberry Pi OS; `.rpm` for Fedora and openSUSE. Pick `
 it from the folder you downloaded it to (keep the `./`):
 
 ```bash
-sudo apt install ./tablowatcherservice_<version>_amd64.deb
+sudo apt install ./tabloid_<version>_amd64.deb
 ```
 
 ```bash
-sudo dnf install ./tablowatcherservice-<version>-1.x86_64.rpm
+sudo dnf install ./tabloid-<version>-1.x86_64.rpm
 ```
 
 This installs the app to `/opt/tablowatcherservice` and starts it as the
@@ -125,9 +125,9 @@ This installs the app to `/opt/tablowatcherservice` and starts it as the
 **Updating:** download the newer package from the Releases page and install it the same
 way. It upgrades in place and keeps your settings.
 
-**Uninstalling:** `sudo apt remove tablowatcherservice` or `sudo dnf remove
-tablowatcherservice`. Your settings stay in `/opt/tablowatcherservice` in case you
-reinstall; `sudo apt purge tablowatcherservice` removes them too.
+**Uninstalling:** `sudo apt remove tabloid` or `sudo dnf remove
+tabloid`. Your settings stay in `/opt/tablowatcherservice` in case you
+reinstall; `sudo apt purge tabloid` removes them too.
 
 If you previously installed with `deploy/install.sh`, first uninstall that with
 `deploy/install.sh --uninstall`. Otherwise the unit file it installed takes precedence over

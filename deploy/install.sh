@@ -27,9 +27,9 @@ fi
 uninstall() {
     # A package install (GitHub Releases .deb/.rpm) owns the same paths; let its package
     # manager remove it, so it doesn't think it's still installed.
-    if dpkg -s "$SERVICE_NAME" &>/dev/null || rpm -q "$SERVICE_NAME" &>/dev/null; then
-        echo "$SERVICE_NAME was installed as a package - remove it with" >&2
-        echo "'sudo apt remove $SERVICE_NAME' or 'sudo dnf remove $SERVICE_NAME' instead." >&2
+    if dpkg -s tabloid &>/dev/null || rpm -q tabloid &>/dev/null; then
+        echo "Tabloid was installed as a package - remove it with" >&2
+        echo "'sudo apt remove tabloid' or 'sudo dnf remove tabloid' instead." >&2
         exit 1
     fi
 
