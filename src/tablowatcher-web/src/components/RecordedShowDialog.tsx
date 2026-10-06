@@ -250,6 +250,7 @@ export function RecordedShowDialog({
 
   const seasonPanel = (s: RecordedShow['seasons'][number]) => (
     <SeasonRecordings
+      showTitle={show.title}
       recordings={s.recordings}
       busy={busy}
       errors={errors}
@@ -396,6 +397,7 @@ export function RecordedShowDialog({
 }
 
 function SeasonRecordings({
+  showTitle,
   recordings,
   busy,
   errors,
@@ -405,6 +407,7 @@ function SeasonRecordings({
   onDeleteSeason,
   ...rowProps
 }: {
+  showTitle: string
   recordings: ShowRecording[]
   busy: boolean
   errors: Map<string, string>
@@ -436,6 +439,7 @@ function SeasonRecordings({
       <div className="divide-y rounded-lg border">
         {recordings.map((r) => (
           <RecordingRow
+            showTitle={showTitle}
             key={r.path}
             recording={r}
             busy={busy}
@@ -456,6 +460,7 @@ function SeasonRecordings({
 }
 
 interface RowProps {
+  showTitle: string
   recording: ShowRecording
   busy: boolean
   error: string | undefined
@@ -472,6 +477,7 @@ interface RowProps {
 }
 
 function RecordingRow({
+  showTitle,
   recording: r,
   busy,
   error,
@@ -583,14 +589,14 @@ function RecordingRow({
           )}
         </div>
       </div>
-      {watching && <RecordingViewer recording={r} />}
+      {watching && <RecordingViewer showTitle={showTitle} recording={r} />}
     </div>
   )
 }
 
 // A small player for one recording, opened under its row. Starts where it was left off; "Start
 // over" plays it from the beginning.
-function RecordingViewer({ recording }: { recording: ShowRecording }) {
+function RecordingViewer({ showTitle, recording }: { showTitle: string; recording: ShowRecording }) {
   // `attempt` changes on every play, so each one remounts the player and starts a fresh stream.
   const [request, setRequest] = useState(() => ({ startAt: resumePosition(recording), attempt: 0 }))
   const [playlistUrl, setPlaylistUrl] = useState<string | null>(null)
@@ -624,6 +630,8 @@ function RecordingViewer({ recording }: { recording: ShowRecording }) {
           playlistUrl={playlistUrl}
           // Any non-empty label - an empty one means "nothing selected" to the player.
           tuningLabel={recording.title ?? 'recording'}
+          mediaTitle={showTitle}
+          mediaSubtitle={recording.title}
           tuneError={error}
           startAt={request.startAt}
           loadingMessage={request.startAt > 0 ? `Resuming at ${formatClock(request.startAt)}` : 'Starting playback'}

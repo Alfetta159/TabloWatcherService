@@ -509,6 +509,8 @@ function App() {
                     key={watchedChannel?.objectId}
                     playlistUrl={playlistUrl}
                     tuningLabel={watchedChannel?.tuningLabel ?? null}
+                    mediaTitle={selectedProgram?.title ?? null}
+                    mediaSubtitle={selectedProgram?.subtitle ?? null}
                     tuneError={tuneError}
                     className="h-full w-full"
                   />

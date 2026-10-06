@@ -351,6 +351,8 @@ export function RecordingPlayerDialog({
             playlistUrl={playlistUrl}
             // Any non-empty label - an empty one means "nothing selected" to the player.
             tuningLabel={item?.title ?? 'recording'}
+            mediaTitle={item?.title ?? null}
+            mediaSubtitle={movie ? (movie.releaseYear?.toString() ?? null) : (sportsEvent?.sport ?? null)}
             tuneError={watchError}
             startAt={playRequest.startAt}
             loadingMessage={playRequest.startAt > 0 ? `Resuming at ${formatClock(playRequest.startAt)}` : 'Starting playback'}
