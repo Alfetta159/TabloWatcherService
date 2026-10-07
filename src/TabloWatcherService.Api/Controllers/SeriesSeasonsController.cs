@@ -13,7 +13,7 @@ public class SeriesSeasonsController(ITabloDeviceClientFactory clientFactory) : 
         var response = await client.GetSeriesSeasonAsync(seasonId);
         if (!response.IsSuccessful)
         {
-            return response.ToErrorResult();
+            return LogFailure(response.ToErrorResult());
         }
 
         return Ok(response.Content);

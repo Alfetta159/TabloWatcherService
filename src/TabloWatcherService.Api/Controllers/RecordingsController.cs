@@ -81,7 +81,7 @@ public class RecordingsController(
         var group = recordings.GetGroups().FirstOrDefault(g => g.Key == path);
         if (group is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var movie = group.Movie;
@@ -119,7 +119,7 @@ public class RecordingsController(
             .FirstOrDefault(g => g.Kind == RecordingKinds.Sport && g.Key.EndsWith($"/{eventId}", StringComparison.Ordinal));
         if (group is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var sport = group.Sport;
@@ -161,7 +161,7 @@ public class RecordingsController(
         var group = recordings.GetGroups().FirstOrDefault(g => g.Key == path);
         if (group is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var series = group.Series;
@@ -244,13 +244,13 @@ public class RecordingsController(
         // Only ever a recording the cache knows about - never an arbitrary device path.
         if (!recordings.Recordings.ContainsKey(request.Path))
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         ApiResponse<WatchInfo> response;
@@ -261,12 +261,12 @@ public class RecordingsController(
         catch (HttpRequestException)
         {
             // The device's embedded server occasionally drops a request; the caller can retry.
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
 
         if (!response.IsSuccessful || response.Content is null)
         {
-            return response.ToErrorResult();
+            return LogFailure(response.ToErrorResult());
         }
 
         return Ok(new { playlistUrl = response.Content.PlaylistUrl });
@@ -283,7 +283,7 @@ public class RecordingsController(
     {
         if (!recordings.Recordings.TryGetValue(request.Path, out var recording))
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
         if (recording.VideoDetails?.State != "recording")
         {
@@ -293,7 +293,7 @@ public class RecordingsController(
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         try
@@ -318,7 +318,7 @@ public class RecordingsController(
             }
             if (!response.IsSuccessful)
             {
-                return response.ToErrorResult();
+                return LogFailure(response.ToErrorResult());
             }
             if (response.Content?.Schedule is { } schedule)
             {
@@ -336,7 +336,7 @@ public class RecordingsController(
         }
         catch (HttpRequestException)
         {
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
 
         return Ok(new { path = recording.Path, state = recording.VideoDetails?.State });
@@ -358,7 +358,7 @@ public class RecordingsController(
         if (current is null)
         {
             recordings.Remove(path);
-            return Problem(statusCode: StatusCodes.Status404NotFound, detail: "This recording is no longer on the Tablo.");
+            return LogFailure(Problem(statusCode: StatusCodes.Status404NotFound, detail: "This recording is no longer on the Tablo."));
         }
         if (current.VideoDetails?.State == "recording")
         {
@@ -379,17 +379,17 @@ public class RecordingsController(
     {
         if (!recordings.Recordings.ContainsKey(request.Path))
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
         if (request.Watched is null && request.Protected is null)
         {
-            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "Nothing to change.");
+            return LogFailure(Problem(statusCode: StatusCodes.Status400BadRequest, detail: "Nothing to change."));
         }
 
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         ApiResponse<RecordedAiring> response;
@@ -401,12 +401,12 @@ public class RecordingsController(
         }
         catch (HttpRequestException)
         {
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
 
         if (!response.IsSuccessful || response.Content is null)
         {
-            return response.ToErrorResult();
+            return LogFailure(response.ToErrorResult());
         }
 
         recordings.Upsert(response.Content);
@@ -422,17 +422,17 @@ public class RecordingsController(
     {
         if (!recordings.Recordings.TryGetValue(request.Path, out var recording))
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
         if (recording.VideoDetails?.State == "recording")
         {
-            return Problem(statusCode: StatusCodes.Status409Conflict, detail: "Stop the recording before deleting it.");
+            return LogFailure(Problem(statusCode: StatusCodes.Status409Conflict, detail: "Stop the recording before deleting it."));
         }
 
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         try
@@ -440,12 +440,12 @@ public class RecordingsController(
             var response = await client.DeleteRecordingAsync(request.Path.TrimStart('/'));
             if (!response.IsSuccessful)
             {
-                return response.ToErrorResult();
+                return LogFailure(response.ToErrorResult());
             }
         }
         catch (HttpRequestException)
         {
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
 
         recordings.Remove(request.Path);

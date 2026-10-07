@@ -17,7 +17,7 @@ public class StorageController(IRecordingsStore recordings, ICurrentTabloDeviceR
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         try
@@ -25,14 +25,14 @@ public class StorageController(IRecordingsStore recordings, ICurrentTabloDeviceR
             var response = await client.GetHardDrivesAsync();
             if (!response.IsSuccessful)
             {
-                return response.ToErrorResult();
+                return LogFailure(response.ToErrorResult());
             }
 
             return Ok(response.Content);
         }
         catch (HttpRequestException)
         {
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
     }
 

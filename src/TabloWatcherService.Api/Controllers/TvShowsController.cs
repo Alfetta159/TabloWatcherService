@@ -63,7 +63,7 @@ public class TvShowsController(
         var series = store.GetUpcomingSeries($"/guide/series/{seriesId}", DateTime.UtcNow);
         if (series is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         // The dialog still shows the show and its episodes if the device can't be reached;
@@ -105,13 +105,13 @@ public class TvShowsController(
         var series = store.GetUpcomingSeries($"/guide/series/{seriesId}", DateTime.UtcNow);
         if (series is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         try
@@ -119,7 +119,7 @@ public class TvShowsController(
             var current = await client.GetGuideSeriesByIdAsync(seriesId);
             if (!current.IsSuccessStatusCode || current.Content is null)
             {
-                return current.ToErrorResult();
+                return LogFailure(current.ToErrorResult());
             }
 
             // A channel limit must be one the show airs on - or the one already set, which
@@ -133,7 +133,7 @@ public class TvShowsController(
                 && EndOffsets.Contains(request.EndOffset);
             if (!valid)
             {
-                return BadRequest();
+                return LogFailure(BadRequest());
             }
 
             var live = current.Content;
@@ -144,7 +144,7 @@ public class TvShowsController(
                 var updated = await client.UpdateGuideSeriesAsync(seriesId, new JsonObject { ["schedule"] = request.Rule });
                 if (!updated.IsSuccessStatusCode || updated.Content is null)
                 {
-                    return updated.ToErrorResult();
+                    return LogFailure(updated.ToErrorResult());
                 }
                 live = updated.Content;
             }
@@ -177,7 +177,7 @@ public class TvShowsController(
                 });
                 if (!updated.IsSuccessStatusCode || updated.Content is null)
                 {
-                    return updated.ToErrorResult();
+                    return LogFailure(updated.ToErrorResult());
                 }
                 live = updated.Content;
             }
@@ -189,7 +189,7 @@ public class TvShowsController(
         {
             // The device's embedded server occasionally drops a request outright (see
             // AiringsRefreshService); the caller can simply try again.
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
     }
 

@@ -54,7 +54,7 @@ public class MoviesController(IAiringsStore store, IBlockedTagsStore blockedTags
         var movie = store.GetUpcomingMovie($"/guide/movies/{movieId}", DateTime.UtcNow);
         if (movie is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var details = movie.Details;

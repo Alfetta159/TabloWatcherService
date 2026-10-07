@@ -41,7 +41,7 @@ public class ChannelsController(
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         List<GuideChannel> channels;
@@ -50,20 +50,20 @@ public class ChannelsController(
             var pathsResponse = await client.GetGuideChannelsAsync();
             if (!pathsResponse.IsSuccessful)
             {
-                return pathsResponse.ToErrorResult();
+                return LogFailure(pathsResponse.ToErrorResult());
             }
 
             var (fetched, failedChunks) = await TabloBatch.FetchAsync<GuideChannel>(
                 client, pathsResponse.Content ?? [], logger, cancellationToken);
             if (failedChunks > 0 && fetched.Count == 0)
             {
-                return StatusCode(StatusCodes.Status502BadGateway);
+                return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
             }
             channels = fetched;
         }
         catch (HttpRequestException)
         {
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
 
         var now = DateTime.UtcNow;

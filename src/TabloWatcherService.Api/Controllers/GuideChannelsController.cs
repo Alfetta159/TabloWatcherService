@@ -19,7 +19,7 @@ public class GuideChannelsController(ITabloDeviceClientFactory clientFactory) : 
         var response = await client.GetGuideChannelAsync(channelId);
         if (!response.IsSuccessful)
         {
-            return response.ToErrorResult();
+            return LogFailure(response.ToErrorResult());
         }
 
         return Ok(response.Content);

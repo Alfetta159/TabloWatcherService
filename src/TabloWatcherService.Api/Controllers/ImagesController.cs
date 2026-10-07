@@ -18,7 +18,7 @@ public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : Logg
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         try
@@ -44,7 +44,7 @@ public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : Logg
             // catches this internally - see RefitResponseExtensions), so the device's known
             // occasional dropped connection surfaces as a real exception here. Nothing to
             // retry against for a single image load, so just report it rather than 500.
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
     }
 
@@ -69,7 +69,7 @@ public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : Logg
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         int? imageId = null;
@@ -87,7 +87,7 @@ public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : Logg
 
         if (imageId is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         return RedirectToAction(nameof(Get), new { imageId });

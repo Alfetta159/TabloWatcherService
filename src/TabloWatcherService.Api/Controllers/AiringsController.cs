@@ -28,13 +28,13 @@ public class AiringsController(ICurrentTabloDeviceResolver deviceResolver, IAiri
         var airing = store.GetAiring(request.Path);
         if (airing is null || !SchedulablePathPrefixes.Any(request.Path.StartsWith))
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         ApiResponse<Models.Airing> response;
@@ -46,12 +46,12 @@ public class AiringsController(ICurrentTabloDeviceResolver deviceResolver, IAiri
         {
             // The device's embedded server occasionally drops a request outright (see
             // AiringsRefreshService); the caller can simply try again.
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
 
         if (!response.IsSuccessStatusCode || response.Content?.Schedule is null)
         {
-            return response.ToErrorResult();
+            return LogFailure(response.ToErrorResult());
         }
 
         store.UpdateSchedule(request.Path, response.Content.Schedule);
