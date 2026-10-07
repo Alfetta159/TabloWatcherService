@@ -9,7 +9,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// <see cref="ITabloDeviceClientFactory"/>.
 /// </summary>
 [ApiController]
-public abstract class TabloDeviceControllerBase<TResponse,TBatchResponse>(ITabloDeviceClientFactory clientFactory) : ControllerBase
+public abstract class TabloDeviceControllerBase<TResponse,TBatchResponse>(ITabloDeviceClientFactory clientFactory) : LoggedControllerBase
 {
     protected ITabloDeviceClientFactory ClientFactory { get; } = clientFactory;
 

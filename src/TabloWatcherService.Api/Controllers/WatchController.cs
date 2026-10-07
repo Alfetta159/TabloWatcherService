@@ -10,7 +10,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/watch")]
-public class WatchController(ICurrentTabloDeviceResolver deviceResolver) : ControllerBase
+public class WatchController(ICurrentTabloDeviceResolver deviceResolver) : LoggedControllerBase
 {
     private const int TunerLookupAttempts = 6;
     private static readonly TimeSpan TunerLookupRetryDelay = TimeSpan.FromMilliseconds(500);
@@ -21,13 +21,13 @@ public class WatchController(ICurrentTabloDeviceResolver deviceResolver) : Contr
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var response = await client.WatchChannelAsync(channelId);
         if (!response.IsSuccessful)
         {
-            return response.ToErrorResult();
+            return LogFailure(response.ToErrorResult());
         }
 
         return Ok(response.Content);
@@ -42,13 +42,13 @@ public class WatchController(ICurrentTabloDeviceResolver deviceResolver) : Contr
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var tuners = await client.GetTunersAsync();
         if (!tuners.IsSuccessful || tuners.Content is null)
         {
-            return tuners.ToErrorResult();
+            return LogFailure(tuners.ToErrorResult());
         }
 
         var channelsByTuner = tuners.Content
@@ -72,7 +72,7 @@ public class WatchController(ICurrentTabloDeviceResolver deviceResolver) : Contr
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var channelPath = $"/guide/channels/{channelId}";

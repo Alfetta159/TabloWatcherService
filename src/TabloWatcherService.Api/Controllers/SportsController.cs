@@ -14,7 +14,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/sports")]
-public class SportsController(IAiringsStore store, IBlockedTagsStore blockedTags) : ControllerBase
+public class SportsController(IAiringsStore store, IBlockedTagsStore blockedTags) : LoggedControllerBase
 {
     [HttpGet]
     public IActionResult Get()

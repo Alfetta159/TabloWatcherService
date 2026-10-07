@@ -14,7 +14,7 @@ namespace TabloWatcherService.Api.Controllers;
 public class ManualRecordingsController(
     ICurrentTabloDeviceResolver deviceResolver,
     IDeviceChannels deviceChannels,
-    IAiringsStore airings) : ControllerBase
+    IAiringsStore airings) : LoggedControllerBase
 {
     private static readonly string[] DayNames =
         ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -46,7 +46,7 @@ public class ManualRecordingsController(
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         try
@@ -54,13 +54,13 @@ public class ManualRecordingsController(
             var pathsResponse = await client.GetGuideProgramsAsync();
             if (!pathsResponse.IsSuccessStatusCode || pathsResponse.Content is null)
             {
-                return pathsResponse.ToErrorResult();
+                return LogFailure(pathsResponse.ToErrorResult());
             }
 
             var programs = await BatchAsync<ManualProgram>(client, pathsResponse.Content);
             if (programs is null)
             {
-                return StatusCode(StatusCodes.Status502BadGateway);
+                return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
             }
 
             var channels = await ChannelsByPathAsync();
@@ -81,7 +81,7 @@ public class ManualRecordingsController(
         }
         catch (HttpRequestException)
         {
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
     }
 
@@ -92,7 +92,7 @@ public class ManualRecordingsController(
     {
         if (Validate(request) is { } problem)
         {
-            return ValidationProblem(new ValidationProblemDetails(problem));
+            return LogFailure(ValidationProblem(new ValidationProblemDetails(problem)));
         }
 
         var config = new ManualProgramConfig
@@ -131,7 +131,7 @@ public class ManualRecordingsController(
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         try
@@ -139,7 +139,7 @@ public class ManualRecordingsController(
             var response = await client.CreateManualProgramAsync(new CreateManualProgramRequest(config));
             if (!response.IsSuccessStatusCode || response.Content is null)
             {
-                return response.ToErrorResult();
+                return LogFailure(response.ToErrorResult());
             }
 
             var channels = await ChannelsByPathAsync();
@@ -147,7 +147,7 @@ public class ManualRecordingsController(
         }
         catch (HttpRequestException)
         {
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
     }
 
@@ -161,7 +161,7 @@ public class ManualRecordingsController(
         var client = await deviceResolver.ResolveAsync();
         if (client is null)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            return LogFailure(StatusCode(StatusCodes.Status503ServiceUnavailable));
         }
 
         try
@@ -170,15 +170,15 @@ public class ManualRecordingsController(
             var existing = await client.GetManualProgramAsync(programId);
             if (!existing.IsSuccessStatusCode || existing.Content is null)
             {
-                return existing.ToErrorResult();
+                return LogFailure(existing.ToErrorResult());
             }
 
             var response = await client.DeleteManualProgramAsync(programId);
-            return response.IsSuccessStatusCode ? NoContent() : response.ToErrorResult();
+            return response.IsSuccessStatusCode ? NoContent() : RefitResponseExtensions.ToErrorResult(response);
         }
         catch (HttpRequestException)
         {
-            return StatusCode(StatusCodes.Status502BadGateway);
+            return LogFailure(StatusCode(StatusCodes.Status502BadGateway));
         }
     }
 

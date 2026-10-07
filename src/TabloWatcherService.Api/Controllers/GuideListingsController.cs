@@ -10,7 +10,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/guide/listings")]
-public class GuideListingsController(IAiringsStore store) : ControllerBase
+public class GuideListingsController(IAiringsStore store) : LoggedControllerBase
 {
     [HttpGet]
     public IActionResult Get() => Ok(new

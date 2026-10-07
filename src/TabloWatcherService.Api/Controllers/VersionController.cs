@@ -10,7 +10,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/version")]
-public class VersionController : ControllerBase
+public class VersionController : LoggedControllerBase
 {
     // e.g. "0.1.0-preview9+5ce7050..." - the SDK appends the commit when built from a git checkout.
     private static readonly string InformationalVersion =

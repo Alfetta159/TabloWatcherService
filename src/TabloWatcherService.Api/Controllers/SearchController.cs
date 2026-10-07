@@ -13,7 +13,7 @@ namespace TabloWatcherService.Api.Controllers;
 [ApiController]
 [Route("api/search")]
 public class SearchController(IAiringsStore store, IRecordingsStore recordings, IBlockedTagsStore blockedTags)
-    : ControllerBase
+    : LoggedControllerBase
 {
     private const int MaxTermLength = 100;
 
@@ -71,14 +71,14 @@ public class SearchController(IAiringsStore store, IRecordingsStore recordings, 
         var detailed = store.GetDetailedAiring(path);
         if (detailed is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var (airing, series, movie, sport) = detailed;
         var genres = series?.Genres ?? movie?.Genres ?? sport?.Genres ?? [];
         if (genres.Any(blockedTags.Get().Contains))
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         MovieImage? thumbnail = series?.ThumbnailImage ?? movie?.ThumbnailImage ?? sport?.ThumbnailImage;

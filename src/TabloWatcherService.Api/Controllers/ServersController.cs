@@ -4,7 +4,7 @@ namespace TabloWatcherService.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ServersController(IAssociationServerClient associationServerClient) : ControllerBase
+public class ServersController(IAssociationServerClient associationServerClient) : LoggedControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> Get()
@@ -12,7 +12,7 @@ public class ServersController(IAssociationServerClient associationServerClient)
         var response = await associationServerClient.GetRecordersAsync();
         if (!response.IsSuccessful)
         {
-            return response.ToErrorResult();
+            return LogFailure(response.ToErrorResult());
         }
 
         return Ok(response.Content?.Recorders);

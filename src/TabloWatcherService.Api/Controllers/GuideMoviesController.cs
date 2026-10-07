@@ -16,7 +16,7 @@ public class GuideMoviesController(ITabloDeviceClientFactory clientFactory) : Ta
         var response = await client.GetGuideMovieAsync(movieId);
         if (!response.IsSuccessful)
         {
-            return response.ToErrorResult();
+            return LogFailure(response.ToErrorResult());
         }
 
         return Ok(response.Content);

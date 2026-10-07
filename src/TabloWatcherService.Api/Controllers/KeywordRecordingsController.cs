@@ -14,7 +14,7 @@ namespace TabloWatcherService.Api.Controllers;
 public class KeywordRecordingsController(
     IKeywordRulesStore rules,
     IAiringsStore airings,
-    KeywordRecordingService keywordRecordings) : ControllerBase
+    KeywordRecordingService keywordRecordings) : LoggedControllerBase
 {
     // A preview lists this many matches at most; the count is always the full one.
     private const int PreviewLimit = 50;
@@ -79,7 +79,7 @@ public class KeywordRecordingsController(
         var criteria = request.ToCriteria();
         if (Validate(criteria) is { } problem)
         {
-            return ValidationProblem(new ValidationProblemDetails(problem));
+            return LogFailure(ValidationProblem(new ValidationProblemDetails(problem)));
         }
 
         var matches = keywordRecordings.Matches(criteria);
@@ -98,7 +98,7 @@ public class KeywordRecordingsController(
         var criteria = request.ToCriteria();
         if (Validate(criteria) is { } problem)
         {
-            return ValidationProblem(new ValidationProblemDetails(problem));
+            return LogFailure(ValidationProblem(new ValidationProblemDetails(problem)));
         }
 
         var name = string.IsNullOrWhiteSpace(request.Name) ? DefaultName(criteria) : request.Name.Trim();
@@ -118,7 +118,7 @@ public class KeywordRecordingsController(
         var rule = rules.Get(id);
         if (rule is null)
         {
-            return NotFound();
+            return LogFailure(NotFound());
         }
 
         var (cancelled, failed) = cancelScheduled ? await keywordRecordings.CancelScheduledAsync(rule) : (0, 0);
