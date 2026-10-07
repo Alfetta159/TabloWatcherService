@@ -13,7 +13,7 @@ namespace TabloWatcherService.Api.Controllers;
 [ApiController]
 [Route("api/search")]
 public class SearchController(IAiringsStore store, IRecordingsStore recordings, IBlockedTagsStore blockedTags)
-    : ControllerBase
+    : LoggedControllerBase
 {
     private const int MaxTermLength = 100;
 

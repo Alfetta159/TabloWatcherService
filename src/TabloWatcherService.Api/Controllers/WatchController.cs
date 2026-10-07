@@ -10,7 +10,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/watch")]
-public class WatchController(ICurrentTabloDeviceResolver deviceResolver) : ControllerBase
+public class WatchController(ICurrentTabloDeviceResolver deviceResolver) : LoggedControllerBase
 {
     private const int TunerLookupAttempts = 6;
     private static readonly TimeSpan TunerLookupRetryDelay = TimeSpan.FromMilliseconds(500);

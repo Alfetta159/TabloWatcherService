@@ -8,7 +8,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/guide/grid")]
-public class GuideGridController(IAiringsStore store) : ControllerBase
+public class GuideGridController(IAiringsStore store) : LoggedControllerBase
 {
     [HttpGet]
     public IActionResult Get([FromQuery] DateTime? from, [FromQuery] DateTime? to)

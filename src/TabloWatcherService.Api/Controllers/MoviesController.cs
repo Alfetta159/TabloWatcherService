@@ -12,7 +12,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/movies")]
-public class MoviesController(IAiringsStore store, IBlockedTagsStore blockedTags) : ControllerBase
+public class MoviesController(IAiringsStore store, IBlockedTagsStore blockedTags) : LoggedControllerBase
 {
     [HttpGet]
     public IActionResult Get()

@@ -8,7 +8,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/storage")]
-public class StorageController(IRecordingsStore recordings, ICurrentTabloDeviceResolver deviceResolver) : ControllerBase
+public class StorageController(IRecordingsStore recordings, ICurrentTabloDeviceResolver deviceResolver) : LoggedControllerBase
 {
     /// <summary>The device's drives, straight from it (GET /server/harddrives).</summary>
     [HttpGet("hard-drives")]

@@ -4,7 +4,7 @@ namespace TabloWatcherService.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ServersController(IAssociationServerClient associationServerClient) : ControllerBase
+public class ServersController(IAssociationServerClient associationServerClient) : LoggedControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> Get()

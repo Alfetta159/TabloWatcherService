@@ -14,7 +14,7 @@ namespace TabloWatcherService.Api.Controllers;
 public class ManualRecordingsController(
     ICurrentTabloDeviceResolver deviceResolver,
     IDeviceChannels deviceChannels,
-    IAiringsStore airings) : ControllerBase
+    IAiringsStore airings) : LoggedControllerBase
 {
     private static readonly string[] DayNames =
         ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];

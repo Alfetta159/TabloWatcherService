@@ -10,7 +10,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/images")]
-public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : ControllerBase
+public class ImagesController(ICurrentTabloDeviceResolver deviceResolver) : LoggedControllerBase
 {
     [HttpGet("{imageId:int}")]
     public async Task<IActionResult> Get(int imageId)

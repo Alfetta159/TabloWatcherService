@@ -17,7 +17,7 @@ public class ChannelsController(
     IDeviceChannels deviceChannels,
     IAiringsStore store,
     IRecordingsStore recordings,
-    ILogger<ChannelsController> logger) : ControllerBase
+    ILogger<ChannelsController> logger) : LoggedControllerBase
 {
     // How many airings after the current one each channel lists.
     private const int UpNextCount = 3;

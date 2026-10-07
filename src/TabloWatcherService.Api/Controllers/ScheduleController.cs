@@ -9,7 +9,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/schedule")]
-public class ScheduleController(IAiringsStore airings) : ControllerBase
+public class ScheduleController(IAiringsStore airings) : LoggedControllerBase
 {
     /// <param name="includeSkipped">
     /// Also list airings a recording rule covers but the device won't record (e.g. already

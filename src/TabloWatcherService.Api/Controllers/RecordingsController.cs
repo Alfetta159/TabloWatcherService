@@ -14,7 +14,7 @@ namespace TabloWatcherService.Api.Controllers;
 public class RecordingsController(
     IRecordingsStore recordings,
     IAiringsStore airings,
-    ICurrentTabloDeviceResolver deviceResolver) : ControllerBase
+    ICurrentTabloDeviceResolver deviceResolver) : LoggedControllerBase
 {
     // The body of watch/stop/delete: which recording.
     public record WatchRequest(string Path);

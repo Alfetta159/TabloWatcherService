@@ -4,7 +4,7 @@ namespace TabloWatcherService.Api.Controllers;
 
 [ApiController]
 [Route("api/guide-series-seasons")]
-public class SeriesSeasonsController(ITabloDeviceClientFactory clientFactory) : ControllerBase
+public class SeriesSeasonsController(ITabloDeviceClientFactory clientFactory) : LoggedControllerBase
 {
     [HttpGet("{seasonId:int}")]
     public async Task<IActionResult> GetById(int seasonId, [FromQuery] string ip, [FromQuery] int port = 8885)

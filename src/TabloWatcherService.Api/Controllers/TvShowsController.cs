@@ -18,7 +18,7 @@ public class TvShowsController(
     IAiringsStore store,
     IBlockedTagsStore blockedTags,
     ICurrentTabloDeviceResolver deviceResolver,
-    ILogger<TvShowsController> logger) : ControllerBase
+    ILogger<TvShowsController> logger) : LoggedControllerBase
 {
     // The choices the TV Shows dialog offers, and so all this accepts. Offsets are seconds.
     private static readonly string[] Rules = ["all", "new", "none"];

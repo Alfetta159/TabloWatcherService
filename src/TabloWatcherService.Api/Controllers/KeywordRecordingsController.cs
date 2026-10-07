@@ -14,7 +14,7 @@ namespace TabloWatcherService.Api.Controllers;
 public class KeywordRecordingsController(
     IKeywordRulesStore rules,
     IAiringsStore airings,
-    KeywordRecordingService keywordRecordings) : ControllerBase
+    KeywordRecordingService keywordRecordings) : LoggedControllerBase
 {
     // A preview lists this many matches at most; the count is always the full one.
     private const int PreviewLimit = 50;

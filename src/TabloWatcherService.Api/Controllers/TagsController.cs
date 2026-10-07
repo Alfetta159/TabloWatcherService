@@ -11,7 +11,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/tags")]
-public class TagsController(IAiringsStore airingsStore, IBlockedTagsStore blockedTagsStore) : ControllerBase
+public class TagsController(IAiringsStore airingsStore, IBlockedTagsStore blockedTagsStore) : LoggedControllerBase
 {
     // Scoped per content type - e.g. the Sports page shouldn't offer a tag that only ever
     // appears on movies - so this takes the same "kind" the frontend already keys its

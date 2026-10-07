@@ -9,7 +9,7 @@ namespace TabloWatcherService.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/airings")]
-public class AiringsController(ICurrentTabloDeviceResolver deviceResolver, IAiringsStore store) : ControllerBase
+public class AiringsController(ICurrentTabloDeviceResolver deviceResolver, IAiringsStore store) : LoggedControllerBase
 {
     // The airing kinds a recording can be set on - each PATCHed at its own path.
     private static readonly string[] SchedulablePathPrefixes =
