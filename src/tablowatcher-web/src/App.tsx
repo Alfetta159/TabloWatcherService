@@ -11,10 +11,9 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GuideGrid, type SelectedProgram, type WatchedChannel } from '@/components/GuideGrid'
 import { LivePlayer } from '@/components/LivePlayer'
 import { RecordButton } from '@/components/Recording'
@@ -119,7 +118,6 @@ function assignTuners(current: Record<number, number>, assignments: TunerAssignm
 
 function App() {
   const [servers, setServers] = useState<Recorder[]>([])
-  const [serversError, setServersError] = useState<string | null>(null)
   const [selectedServerId, setSelectedServerId] = useState('')
   const [selectedNav, setSelectedNav] = useState<string>(NAV_ITEMS[0].label)
   // Leaving a guide page for Live TV when it's hidden from under you.
@@ -178,12 +176,10 @@ function App() {
         .then((data) => {
           if (cancelled) return
           setServers(data)
-          setServersError(null)
           setSelectedServerId((current) => current || data[0]?.serverid || '')
         })
-        .catch((err) => {
+        .catch(() => {
           if (cancelled) return
-          setServersError(err.message)
           retry = setTimeout(load, LOAD_RETRY_INTERVAL_MS)
         })
     }
@@ -529,54 +525,10 @@ function App() {
         ) : selectedNav === 'Settings' ? (
           <SettingsPage />
         ) : (
-          <>
-        <Alert>
-          <AlertTitle>Style preview</AlertTitle>
-          <AlertDescription>
-            This page exists to compare shadcn/ui presets against real components, not just plain text.
-          </AlertDescription>
-        </Alert>
-
-        {serversError && (
           <Alert variant="destructive">
-            <AlertTitle>Couldn't reach the API</AlertTitle>
-            <AlertDescription>/api/servers returned an error: {serversError}</AlertDescription>
+            <AlertTitle>Unsupported page</AlertTitle>
+            <AlertDescription>No content is configured for the selected navigation item.</AlertDescription>
           </Alert>
-        )}
-
-        {servers.map((server) => (
-          <TabsContent key={server.serverid} value={server.serverid}>
-            <Card>
-              <CardHeader>
-                <CardTitle>{server.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Address</span>
-                  <span>
-                    {server.privateIp}
-                    {server.http != null && `:${server.http}`}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Version</span>
-                  <span>{server.serverVersion}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Last seen</span>
-                  <span>{new Date(server.lastSeen).toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Relay</span>
-                  <Badge variant={server.relay ? 'default' : 'secondary'}>
-                    {server.relay ? 'Yes' : 'No'}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        ))}
-          </>
         )}
         </main>
       </div>
