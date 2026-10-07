@@ -35,7 +35,6 @@ interface AudioSettings {
 
 const SEEK_BACKWARD_SECONDS = 10
 const SEEK_FORWARD_SECONDS = 30
-const VOLUME_STEP = 0.1
 
 // The player remounts on every channel change (see App), so the user's volume/mute choice is
 // kept here - and in localStorage, so it survives reloads too. Starts muted, like before.
@@ -82,13 +81,6 @@ function seekTo(video: HTMLVideoElement, time: number) {
 
 function seekBy(video: HTMLVideoElement, offsetSeconds: number) {
   seekTo(video, video.currentTime + offsetSeconds)
-}
-
-function updateVolume(video: HTMLVideoElement, delta: number) {
-  const volume = Math.min(1, Math.max(0, video.volume + delta))
-  video.volume = volume
-  if (volume === 0) video.muted = true
-  else if (video.muted && volume > 0) video.muted = false
 }
 
 // Unmuted autoplay can be refused (browser autoplay policy); fall back to muted rather than
@@ -191,27 +183,27 @@ export function LivePlayer({
     const onPause = () => video.pause()
     const onSeekBackward = () => seekBy(video, -SEEK_BACKWARD_SECONDS)
     const onSeekForward = () => seekBy(video, SEEK_FORWARD_SECONDS)
-    const onVolumeUp = () => updateVolume(video, VOLUME_STEP)
-    const onVolumeDown = () => updateVolume(video, -VOLUME_STEP)
 
     session.setActionHandler('play', onPlay)
     session.setActionHandler('pause', onPause)
     session.setActionHandler('seekbackward', onSeekBackward)
     session.setActionHandler('seekforward', onSeekForward)
-    session.setActionHandler('previoustrack', null)
-    session.setActionHandler('nexttrack', null)
-    session.setActionHandler('stop', null)
-    session.setActionHandler('seekto', null)
-    session.setActionHandler('togglemicrophone', null)
-    session.setActionHandler('togglecamera', null)
-    session.setActionHandler('hangup', null)
-    session.setActionHandler('previoustrack', null)
-    session.setActionHandler('nexttrack', null)
-    session.setActionHandler('stop', null)
-    session.setActionHandler('seekto', null)
-    if ('volumeup' in session) {
-      session.setActionHandler('volumeup' as MediaSessionActionName, onVolumeUp)
-      session.setActionHandler('volumedown' as MediaSessionActionName, onVolumeDown)
+    if (typeof navigator.mediaSession.setActionHandler === 'function') {
+      const volumeActions = ['volumeup', 'volumedown'] as const
+      for (const action of volumeActions) {
+        try {
+          const actionName = action as MediaSessionAction
+          session.setActionHandler(actionName, () => {
+            const delta = action === 'volumeup' ? 0.1 : -0.1
+            const volume = Math.min(1, Math.max(0, video.volume + delta))
+            video.volume = volume
+            if (volume === 0) video.muted = true
+            else if (video.muted && volume > 0) video.muted = false
+          })
+        } catch {
+          // Some browsers omit unsupported Media Session actions; ignore them.
+        }
+      }
     }
     if (typeof MediaMetadata !== 'undefined') {
       session.metadata = new MediaMetadata({
@@ -230,15 +222,13 @@ export function LivePlayer({
       session.setActionHandler('pause', null)
       session.setActionHandler('seekbackward', null)
       session.setActionHandler('seekforward', null)
-      session.setActionHandler('previoustrack', null)
-      session.setActionHandler('nexttrack', null)
-      session.setActionHandler('stop', null)
-      session.setActionHandler('seekto', null)
-      session.setActionHandler('togglemicrophone', null)
-      session.setActionHandler('togglecamera', null)
-      session.setActionHandler('hangup', null)
-      session.setActionHandler('volumeup' as MediaSessionActionName, null)
-      session.setActionHandler('volumedown' as MediaSessionActionName, null)
+      for (const action of ['volumeup', 'volumedown'] as const) {
+        try {
+          session.setActionHandler(action as MediaSessionAction, null)
+        } catch {
+          // Ignore unsupported actions while cleaning up.
+        }
+      }
       session.metadata = null
       session.playbackState = 'none'
     }
