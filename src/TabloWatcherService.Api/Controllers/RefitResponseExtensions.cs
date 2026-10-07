@@ -6,11 +6,16 @@ namespace TabloWatcherService.Api.Controllers;
 
 public static class RefitResponseExtensions
 {
-    public static IActionResult ToErrorResult<T>(this IApiResponse<T> response) =>
+    public static IActionResult ToErrorResult(this IApiResponse response) =>
         // StatusCode is null when the request never got an HTTP response at all
         // (DNS failure, connection refused, timeout), not just on a non-2xx status. A 2xx
         // still lands here when the body couldn't be deserialized (or was missing) - passing
         // that status through would tell the caller everything worked, so it's a 502 too.
+        response.StatusCode is { } statusCode && !response.IsSuccessStatusCode
+            ? new LoggedStatusCodeResult((int)statusCode, response.Error, null)
+            : new BadGatewayResult(response.Error, null);
+
+    public static IActionResult ToErrorResult<T>(this IApiResponse<T> response) =>
         response.StatusCode is { } statusCode && !response.IsSuccessStatusCode
             ? new LoggedStatusCodeResult((int)statusCode, response.Error, response.Content)
             : new BadGatewayResult(response.Error, response.Content);

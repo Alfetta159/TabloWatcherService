@@ -440,7 +440,7 @@ public class RecordingsController(
             var response = await client.DeleteRecordingAsync(request.Path.TrimStart('/'));
             if (!response.IsSuccessful)
             {
-                return LogFailure(response.ToErrorResult());
+                return LogFailure(RefitResponseExtensions.ToErrorResult(response));
             }
         }
         catch (HttpRequestException)

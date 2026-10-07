@@ -1,13 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Logging.Abstractions;
+using ProblemDetails = Microsoft.AspNetCore.Mvc.ProblemDetails;
 
 namespace TabloWatcherService.Api.Controllers;
 
 /// <summary>
 /// Common controller base that logs unsuccessful results for every action.
 /// </summary>
-public abstract class LoggedControllerBase : ControllerBase
+public abstract class LoggedControllerBase : Controller
 {
     private ILoggerFactory LoggerFactory => HttpContext?.RequestServices.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance;
 
@@ -57,7 +58,7 @@ public abstract class LoggedControllerBase : ControllerBase
             case ObjectResult objectResult:
                 statusCode = objectResult.StatusCode ?? objectResult.Value switch
                 {
-                    Microsoft.AspNetCore.Mvc.ProblemDetails problem => problem.Status ?? StatusCodes.Status500InternalServerError,
+                    ProblemDetails problem => problem.Status ?? StatusCodes.Status500InternalServerError,
                     _ => StatusCodes.Status500InternalServerError,
                 };
                 return true;

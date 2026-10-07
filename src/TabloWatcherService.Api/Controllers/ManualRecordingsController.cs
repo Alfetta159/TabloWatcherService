@@ -174,7 +174,7 @@ public class ManualRecordingsController(
             }
 
             var response = await client.DeleteManualProgramAsync(programId);
-            return response.IsSuccessStatusCode ? NoContent() : response.ToErrorResult();
+            return response.IsSuccessStatusCode ? NoContent() : RefitResponseExtensions.ToErrorResult(response);
         }
         catch (HttpRequestException)
         {
