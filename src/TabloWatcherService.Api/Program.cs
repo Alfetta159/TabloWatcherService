@@ -92,25 +92,6 @@ app.MapControllers();
 
 var api = app.MapGroup("/api");
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-api.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
 // An /api URL no endpoint matched is a 404, not the SPA fallback below - otherwise it gets
 // index.html with a 200, which the frontend then fails to parse as JSON ("Unexpected token
 // '<'") instead of reporting the missing route (e.g. against a server built before it).
@@ -122,8 +103,3 @@ app.UseStaticFiles();
 app.MapFallbackToFile("index.html");
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
