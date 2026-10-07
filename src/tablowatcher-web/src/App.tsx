@@ -11,13 +11,9 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GuideGrid, type SelectedProgram, type WatchedChannel } from '@/components/GuideGrid'
 import { LivePlayer } from '@/components/LivePlayer'
 import { RecordButton } from '@/components/Recording'
@@ -30,13 +26,6 @@ import { SearchPage } from '@/components/SearchPage'
 import { SettingsPage } from '@/components/SettingsPage'
 import { MoviesPage, SportsPage, TvShowsPage } from '@/components/UpcomingPages'
 import { formatDuration } from '@/lib/format'
-
-interface WeatherForecast {
-  date: string
-  temperatureC: number
-  temperatureF: number
-  summary: string | null
-}
 
 interface NavItem {
   label: string
@@ -128,10 +117,7 @@ function assignTuners(current: Record<number, number>, assignments: TunerAssignm
 }
 
 function App() {
-  const [forecasts, setForecasts] = useState<WeatherForecast[]>([])
-  const [error, setError] = useState<string | null>(null)
   const [servers, setServers] = useState<Recorder[]>([])
-  const [serversError, setServersError] = useState<string | null>(null)
   const [selectedServerId, setSelectedServerId] = useState('')
   const [selectedNav, setSelectedNav] = useState<string>(NAV_ITEMS[0].label)
   // Leaving a guide page for Live TV when it's hidden from under you.
@@ -178,16 +164,6 @@ function App() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/weatherforecast')
-      .then((res) => {
-        if (!res.ok) throw new Error(`API returned ${res.status}`)
-        return res.json() as Promise<WeatherForecast[]>
-      })
-      .then(setForecasts)
-      .catch((err) => setError(err.message))
-  }, [])
-
-  useEffect(() => {
     let cancelled = false
     let retry: ReturnType<typeof setTimeout> | undefined
 
@@ -200,12 +176,10 @@ function App() {
         .then((data) => {
           if (cancelled) return
           setServers(data)
-          setServersError(null)
           setSelectedServerId((current) => current || data[0]?.serverid || '')
         })
-        .catch((err) => {
+        .catch(() => {
           if (cancelled) return
-          setServersError(err.message)
           retry = setTimeout(load, LOAD_RETRY_INTERVAL_MS)
         })
     }
@@ -551,131 +525,10 @@ function App() {
         ) : selectedNav === 'Settings' ? (
           <SettingsPage />
         ) : (
-          <>
-        <Alert>
-          <AlertTitle>Style preview</AlertTitle>
-          <AlertDescription>
-            This page exists to compare shadcn/ui presets against real components, not just plain text.
-          </AlertDescription>
-        </Alert>
-
-        {error && (
           <Alert variant="destructive">
-            <AlertTitle>Couldn't reach the API</AlertTitle>
-            <AlertDescription>/api/weatherforecast returned an error: {error}</AlertDescription>
+            <AlertTitle>Unsupported page</AlertTitle>
+            <AlertDescription>No content is configured for the selected navigation item.</AlertDescription>
           </Alert>
-        )}
-
-        {serversError && (
-          <Alert variant="destructive">
-            <AlertTitle>Couldn't reach the API</AlertTitle>
-            <AlertDescription>/api/servers returned an error: {serversError}</AlertDescription>
-          </Alert>
-        )}
-
-        {servers.map((server) => (
-          <TabsContent key={server.serverid} value={server.serverid}>
-            <Card>
-              <CardHeader>
-                <CardTitle>{server.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Address</span>
-                  <span>
-                    {server.privateIp}
-                    {server.http != null && `:${server.http}`}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Version</span>
-                  <span>{server.serverVersion}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Last seen</span>
-                  <span>{new Date(server.lastSeen).toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Relay</span>
-                  <Badge variant={server.relay ? 'default' : 'secondary'}>
-                    {server.relay ? 'Yes' : 'No'}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        ))}
-
-        <Tabs defaultValue="forecast">
-          <TabsList>
-            <TabsTrigger value="forecast">Forecast</TabsTrigger>
-            <TabsTrigger value="devices">Devices</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="forecast" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Forecast</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {forecasts.map((f) => (
-                  <div key={f.date} className="flex items-center justify-between text-sm">
-                    <span>{f.date}</span>
-                    <span className="flex items-center gap-2">
-                      {f.temperatureC}&deg;C
-                      <Badge variant="secondary">{f.summary}</Badge>
-                    </span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="devices" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Known devices</CardTitle>
-              </CardHeader>
-              <CardContent className="text-muted-foreground text-sm">
-                No Tablo devices have been added yet.
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        <Separator />
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Add a device</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-2">
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor="device-address">Device address</Label>
-                <Input id="device-address" placeholder="192.168.1.42" />
-              </div>
-              <Button>Add</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Button variants</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              <Button>Default</Button>
-              <Button variant="secondary">Secondary</Button>
-              <Button variant="outline">Outline</Button>
-              <Button variant="ghost">Ghost</Button>
-              <Button variant="destructive">Destructive</Button>
-              <Button variant="link">Link</Button>
-            </div>
-          </CardContent>
-        </Card>
-          </>
         )}
         </main>
       </div>
