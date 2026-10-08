@@ -188,6 +188,23 @@ export function LivePlayer({
     session.setActionHandler('pause', onPause)
     session.setActionHandler('seekbackward', onSeekBackward)
     session.setActionHandler('seekforward', onSeekForward)
+    if (typeof navigator.mediaSession.setActionHandler === 'function') {
+      const volumeActions = ['volumeup', 'volumedown'] as const
+      for (const action of volumeActions) {
+        try {
+          const actionName = action as MediaSessionAction
+          session.setActionHandler(actionName, () => {
+            const delta = action === 'volumeup' ? 0.1 : -0.1
+            const volume = Math.min(1, Math.max(0, video.volume + delta))
+            video.volume = volume
+            if (volume === 0) video.muted = true
+            else if (video.muted && volume > 0) video.muted = false
+          })
+        } catch {
+          // Some browsers omit unsupported Media Session actions; ignore them.
+        }
+      }
+    }
     if (typeof MediaMetadata !== 'undefined') {
       session.metadata = new MediaMetadata({
         title: mediaTitle ?? tuningLabel ?? 'TabloWatcher',
@@ -205,6 +222,13 @@ export function LivePlayer({
       session.setActionHandler('pause', null)
       session.setActionHandler('seekbackward', null)
       session.setActionHandler('seekforward', null)
+      for (const action of ['volumeup', 'volumedown'] as const) {
+        try {
+          session.setActionHandler(action as MediaSessionAction, null)
+        } catch {
+          // Ignore unsupported actions while cleaning up.
+        }
+      }
       session.metadata = null
       session.playbackState = 'none'
     }
