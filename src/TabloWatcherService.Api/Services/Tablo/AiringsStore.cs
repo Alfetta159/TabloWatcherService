@@ -59,9 +59,10 @@ public partial class AiringsStore : IAiringsStore
 
     private readonly string? _devCachePath;
 
-    public AiringsStore(IHostEnvironment environment)
+    public AiringsStore(IHostEnvironment environment, IConfiguration configuration)
     {
-        if (!environment.IsDevelopment())
+        var enableDevelopmentGuideCache = configuration.GetValue("Tablo:EnableDevelopmentGuideCache", true);
+        if (!environment.IsDevelopment() || !enableDevelopmentGuideCache)
         {
             return;
         }

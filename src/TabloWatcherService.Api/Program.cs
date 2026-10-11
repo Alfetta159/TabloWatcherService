@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using TabloWatcherService.Api.Services;
 using TabloWatcherService.Api.Services.Tablo;
+using Microsoft.AspNetCore.Mvc.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,6 +62,12 @@ if (enableTabloRequestLogging)
     tabloDeviceClientBuilder.AddHttpMessageHandler<TabloRequestLoggingHandler>();
 }
 
+var enableControllerRequestLogging = builder.Configuration.GetValue("Tablo:EnableControllerRequestLogging", true);
+if (enableControllerRequestLogging)
+{
+    builder.Logging.AddFilter("TabloWatcherService.Api.ControllerRequestLogging", LogLevel.Information);
+}
+
 builder.Services.AddSingleton<ITabloDeviceClientFactory>(serviceProvider =>
     new TabloDeviceClientFactory(serviceProvider.GetRequiredService<IHttpClientFactory>(), tabloRefitSettings));
 
@@ -88,6 +96,35 @@ builder.Services.AddSingleton<IKeywordRulesStore, KeywordRulesStore>();
 builder.Services.AddSingleton<KeywordRecordingService>();
 
 var app = builder.Build();
+
+if (enableControllerRequestLogging)
+{
+    var controllerRequestLogger = app.Services
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("TabloWatcherService.Api.ControllerRequestLogging");
+
+    app.Use(async (context, next) =>
+    {
+        var startedAt = Stopwatch.GetTimestamp();
+        await next();
+
+        if (context.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>() is not { } action)
+        {
+            return;
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(startedAt);
+        controllerRequestLogger.LogInformation(
+            "Controller endpoint {Controller}.{Action}: {Method} {Path}{Query} -> {StatusCode} in {ElapsedMs:0.000}ms",
+            action.ControllerName,
+            action.ActionName,
+            context.Request.Method,
+            context.Request.Path,
+            context.Request.QueryString,
+            context.Response.StatusCode,
+            elapsed.TotalMilliseconds);
+    });
+}
 
 if (app.Environment.IsDevelopment())
 {
