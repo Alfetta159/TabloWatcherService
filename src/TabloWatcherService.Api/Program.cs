@@ -48,10 +48,13 @@ var tabloDeviceClientBuilder = builder.Services.AddHttpClient(nameof(ITabloDevic
     client.DefaultRequestHeaders.ConnectionClose = true;
 });
 
-if (builder.Environment.IsDevelopment())
+var enableTabloRequestLogging =
+    builder.Environment.IsDevelopment() ||
+    builder.Configuration.GetValue("Tablo:EnableRequestResponseLogging", false);
+if (enableTabloRequestLogging)
 {
-    // Keep request/response logs from the Tablo handler visible during local debugging even
-    // when broader log defaults are tightened.
+    // Keep request/response logs from the Tablo handler visible when explicitly enabled,
+    // even if broader category defaults are higher.
     builder.Logging.AddFilter(typeof(TabloRequestLoggingHandler).FullName!, LogLevel.Information);
     builder.Services.AddTransient<TabloRequestLoggingHandler>();
     tabloDeviceClientBuilder.AddHttpMessageHandler<TabloRequestLoggingHandler>();
