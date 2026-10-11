@@ -50,6 +50,9 @@ var tabloDeviceClientBuilder = builder.Services.AddHttpClient(nameof(ITabloDevic
 
 if (builder.Environment.IsDevelopment())
 {
+    // Keep request/response logs from the Tablo handler visible during local debugging even
+    // when broader log defaults are tightened.
+    builder.Logging.AddFilter(typeof(TabloRequestLoggingHandler).FullName!, LogLevel.Information);
     builder.Services.AddTransient<TabloRequestLoggingHandler>();
     tabloDeviceClientBuilder.AddHttpMessageHandler<TabloRequestLoggingHandler>();
 }
