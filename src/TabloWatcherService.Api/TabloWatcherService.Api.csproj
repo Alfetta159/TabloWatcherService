@@ -8,7 +8,7 @@
          workflow) sets the whole version from the tag with -p:Version, e.g. 0.1.0-preview9.
          GET /api/version reports it, and the SPA is built with the same one (see BuildSpa) so
          it can tell when it's talking to a server from a different build. -->
-    <VersionPrefix>1.0.1</VersionPrefix>
+    <VersionPrefix>1.1.0</VersionPrefix>
     <VersionSuffix>dev</VersionSuffix>
   </PropertyGroup>
 
