@@ -79,7 +79,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 // A recorded movie or sports event in a large dialog, split 1:3 - its details and recordings
-// on the left, playing on the right. Playback starts on open, resuming where it was left off.
+// on the left, playing on the right. Playback stays idle until the user explicitly starts it.
 // `path` is its /recordings/movies/... or /recordings/sports/... path. `onChanged` tells the
 // page to re-read its list after a recording is stopped or deleted; `onEmpty` closes the
 // dialog once there are no recordings of it left.
@@ -124,14 +124,10 @@ export function RecordingPlayerDialog({
       .then((m) => {
         if (cancelled) return
         setItem(m)
-        // Keep playing what's playing, unless it's gone (deleted) or nothing has started yet.
+        // Keep playback off until the user explicitly chooses a recording to watch.
         setPlayRequest((current) => {
           if (current && m.recordings.some((r) => r.path === current.path)) return current
-          const newest = m.recordings[0]
-          if (!newest) return null
-          setPlaylistUrl(null)
-          setWatchError(null)
-          return { path: newest.path, startAt: resumePosition(newest), attempt: (current?.attempt ?? 0) + 1 }
+          return null
         })
       })
       .catch((err) => {
