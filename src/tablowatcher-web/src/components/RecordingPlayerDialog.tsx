@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { CircleStop, LoaderCircle, Play, RotateCcw, Trash2 } from 'lucide-react'
+import { CircleStop, FastForward, LoaderCircle, Play, Rewind, RotateCcw, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -86,17 +86,19 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function RecordingPlayerDialog({
   kind,
   path,
+  defaultStartAt,
   onChanged,
   onEmpty,
 }: {
   kind: 'movie' | 'sport'
   path: string
+  defaultStartAt?: number
   onChanged: () => void
   onEmpty: () => void
 }) {
   const [item, setItem] = useState<RecordedDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [playRequest, setPlayRequest] = useState<PlayRequest | null>(null)
+  const [playRequest, setPlayRequest] = useState<PlayRequest | null>(defaultStartAt == null ? null : { path, startAt: defaultStartAt, attempt: 0 })
   const [playlistUrl, setPlaylistUrl] = useState<string | null>(null)
   const [watchError, setWatchError] = useState<string | null>(null)
   const [posterFailed, setPosterFailed] = useState(false)
@@ -112,6 +114,12 @@ export function RecordingPlayerDialog({
     setPlaylistUrl(null)
     setWatchError(null)
     setPlayRequest((prev) => ({ path: recording.path, startAt, attempt: (prev?.attempt ?? 0) + 1 }))
+  }
+
+  function seekBy(offsetSeconds: number) {
+    const playingRecord = item?.recordings.find((r) => r.path === playRequest?.path) ?? null
+    if (!playingRecord) return
+    playFrom(playingRecord, Math.max(0, (playRequest?.startAt ?? resumePosition(playingRecord)) + offsetSeconds))
   }
 
   useEffect(() => {
@@ -254,6 +262,14 @@ export function RecordingPlayerDialog({
                 <Button size="sm" variant="outline" onClick={() => playFrom(playing, 0)}>
                   <RotateCcw className="size-4" />
                   Start over
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => seekBy(-10)}>
+                  <Rewind className="size-4" />
+                  -10s
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => seekBy(30)}>
+                  <FastForward className="size-4" />
+                  +30s
                 </Button>
               </div>
             )}

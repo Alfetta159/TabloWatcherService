@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { CircleDot, Clapperboard } from 'lucide-react'
+import { CircleDot, Clapperboard, FastForward, Play, Rewind } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -145,7 +145,6 @@ function posterImageId(artwork: Artwork, snapshotImageId: number | null = null):
   return artwork.thumbnailImageId ?? artwork.coverImageId ?? snapshotImageId ?? artwork.backgroundImageId
 }
 
-// The layout shared by recorded and scheduled cards: poster (with pills), then text lines.
 function RecordingCard({
   title,
   subtitle,
@@ -155,6 +154,8 @@ function RecordingCard({
   lines,
   genres,
   onOpen,
+  onPlay,
+  onSeek,
 }: {
   title: string
   subtitle: string | null
@@ -163,15 +164,19 @@ function RecordingCard({
   pill: ReactNode
   lines: Array<string | ReactNode>
   genres: string[]
-  // Makes the card clickable (and keyboard-activatable).
   onOpen?: () => void
+  onPlay?: (startAt?: number) => void
+  onSeek?: (offsetSeconds: number) => void
 }) {
   const [imageFailed, setImageFailed] = useState(false)
+  const [hovering, setHovering] = useState(false)
 
   return (
     <Card
       className={`gap-0 overflow-hidden py-0 ${onOpen ? 'hover:ring-primary/50 focus-visible:ring-primary cursor-pointer transition-shadow outline-none hover:ring-2 focus-visible:ring-2' : ''}`}
       title={description ?? undefined}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
       {...(onOpen && {
         role: 'button',
         tabIndex: 0,
@@ -200,6 +205,50 @@ function RecordingCard({
           </div>
         )}
         {pill && <div className="absolute top-2 right-2">{pill}</div>}
+        {onOpen && (
+          <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 transition-opacity ${hovering ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="flex items-center justify-between gap-3 text-white">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{title}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  aria-label={`Play ${title}`}
+                  className="bg-primary flex size-8 items-center justify-center rounded-full text-black shadow-md transition-transform hover:scale-105"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                   onPlay?.(0)
+                  }}
+                >
+                  <Play className="ml-0.5 size-4 fill-current" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Rewind 10 seconds of ${title}`}
+                  className="bg-white/15 flex size-8 items-center justify-center rounded-full text-white shadow-md backdrop-blur-sm transition-transform hover:scale-105"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                   onSeek?.(-10)
+                  }}
+                >
+                  <Rewind className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Fast-forward 30 seconds of ${title}`}
+                  className="bg-white/15 flex size-8 items-center justify-center rounded-full text-white shadow-md backdrop-blur-sm transition-transform hover:scale-105"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                   onSeek?.(30)
+                  }}
+                >
+                  <FastForward className="size-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       <div className="space-y-1 p-3 text-sm">
         <p className="line-clamp-2 font-medium leading-snug">{title}</p>
@@ -252,7 +301,7 @@ export function RecordingsPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [sortOrder, setSortOrder] = useState<SortOrder>('date')
   // The recorded movie or sports event open in the player dialog.
-  const [playing, setPlaying] = useState<{ kind: 'movie' | 'sport'; path: string } | null>(null)
+  const [playing, setPlaying] = useState<{ kind: 'movie' | 'sport'; path: string; defaultStartAt?: number } | null>(null)
   const closePlayer = useCallback(() => setPlaying(null), [])
   // The recorded TV show or program open in its recordings dialog.
   const [openShow, setOpenShow] = useState<{ kind: 'tv' | 'program'; path: string } | null>(null)
@@ -374,6 +423,16 @@ export function RecordingsPage() {
                         ? () => setPlaying({ kind: group.kind as 'movie' | 'sport', path: group.key })
                         : () => setOpenShow({ kind: group.kind as 'tv' | 'program', path: group.key })
                     }
+                    onPlay={
+                      group.kind === 'movie' || group.kind === 'sport'
+                        ? (startAt) => setPlaying({ kind: group.kind as 'movie' | 'sport', path: group.key, defaultStartAt: startAt })
+                        : undefined
+                    }
+                    onSeek={
+                      group.kind === 'movie' || group.kind === 'sport'
+                        ? (offset) => setPlaying({ kind: group.kind as 'movie' | 'sport', path: group.key, defaultStartAt: offset })
+                        : undefined
+                    }
                   />
                 ))}
           </div>
@@ -386,6 +445,7 @@ export function RecordingsPage() {
             key={playing.path}
             kind={playing.kind}
             path={playing.path}
+            defaultStartAt={playing.defaultStartAt}
             onChanged={recorded.reload}
             onEmpty={closePlayer}
           />
