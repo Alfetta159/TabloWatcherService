@@ -41,7 +41,8 @@ public partial class AiringsStore : IAiringsStore
 
     // Persisted only in Development (see DevCache) - the raw inputs to Replace(), so a
     // restarted debugger can rebuild the same snapshot without waiting on a fresh,
-    // sequentially-batched fetch from the Tablo device.
+    // sequentially-batched fetch from the Tablo device. If it's older than the normal
+    // refresh interval, startup discards it and forces a fresh batch run.
     private record CachedGuide(DateTimeOffset SavedAt, IReadOnlyList<Airing> Airings, GuideDetails Details);
 
     // Assigned wholesale by Replace(), never mutated in place, so a concurrent reader
@@ -57,9 +58,11 @@ public partial class AiringsStore : IAiringsStore
             new Dictionary<string, GuideMovie>(),
             new Dictionary<string, GuideSport>()));
 
+    private static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromMinutes(15);
+
     private readonly string? _devCachePath;
 
-    public AiringsStore(IHostEnvironment environment)
+    public AiringsStore(IHostEnvironment environment, IConfiguration configuration)
     {
         if (!environment.IsDevelopment())
         {
@@ -69,6 +72,20 @@ public partial class AiringsStore : IAiringsStore
         _devCachePath = Path.Combine(environment.ContentRootPath, "dev-guide-cache.json");
         if (DevCache.Load<CachedGuide>(_devCachePath) is { } cached)
         {
+            var refreshInterval = TimeSpan.FromMinutes(
+                configuration.GetValue("Tablo:AiringsRefreshIntervalMinutes", 15));
+            if (refreshInterval <= TimeSpan.Zero)
+            {
+                refreshInterval = DefaultRefreshInterval;
+            }
+
+            if (DateTimeOffset.UtcNow - cached.SavedAt >= refreshInterval)
+            {
+                // If dev persistence is stale, force a fresh sequential batch run on startup.
+                DevCache.Delete(_devCachePath);
+                return;
+            }
+
             BuildSnapshot(cached.Airings, cached.Details);
             LastUpdated = cached.SavedAt;
         }

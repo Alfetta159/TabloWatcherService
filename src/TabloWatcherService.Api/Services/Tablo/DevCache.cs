@@ -39,4 +39,23 @@ internal static class DevCache
             // Best-effort - a dev convenience, not core functionality.
         }
     }
+
+    public static void Delete(string filePath)
+    {
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+        }
+        catch (IOException)
+        {
+            // Best-effort - a dev convenience, not core functionality.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Best-effort - a dev convenience, not core functionality.
+        }
+    }
 }
