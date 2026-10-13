@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
-import { LoaderCircle } from 'lucide-react'
+import { LoaderCircle, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 interface LivePlayerProps {
   playlistUrl: string | null
@@ -139,6 +140,34 @@ export function LivePlayer({
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
 
+  const [hovered, setHovered] = useState(false)
+  const [muted, setMuted] = useState(audioSettings.muted)
+  const [volume, setVolume] = useState(audioSettings.volume)
+
+  function applyVolume(video: HTMLVideoElement, nextVolume: number) {
+    const bounded = Math.min(1, Math.max(0, nextVolume))
+    video.volume = bounded
+    if (bounded === 0) video.muted = true
+    else if (video.muted && bounded > 0) video.muted = false
+    setVolume(video.volume)
+    setMuted(video.muted)
+    saveAudioSettings(video)
+  }
+
+  function toggleMute(video: HTMLVideoElement | null) {
+    if (!video) return
+    video.muted = !video.muted
+    if (video.volume === 0 && !video.muted) video.volume = audioSettings.volume || 0.5
+    setVolume(video.volume)
+    setMuted(video.muted)
+    saveAudioSettings(video)
+  }
+
+  function seek(video: HTMLVideoElement | null, offsetSeconds: number) {
+    if (!video) return
+    seekBy(video, offsetSeconds)
+  }
+
   // A layout effect, so its cleanup runs while the video is still in the page: moving it out
   // then doesn't pause it.
   useLayoutEffect(() => {
@@ -151,11 +180,15 @@ export function LivePlayer({
     const video = document.createElement('video')
     // Fills the pane, letterboxed to the video's own aspect ratio.
     video.className = 'h-full w-full object-contain'
-    video.controls = true
+    video.controls = false
     video.volume = audioSettings.volume
     video.muted = audioSettings.muted
     video.addEventListener('playing', () => setPlaying(true))
-    video.addEventListener('volumechange', () => saveAudioSettings(video))
+    video.addEventListener('volumechange', () => {
+      setVolume(video.volume)
+      setMuted(video.muted)
+      saveAudioSettings(video)
+    })
     videoRef.current = video
     host.appendChild(video)
 
@@ -259,13 +292,96 @@ export function LivePlayer({
     )
   }
 
+  const currentVideo = videoRef.current
+  const isMuted = currentVideo ? currentVideo.muted : muted
+  const currentVolume = currentVideo ? currentVideo.volume : volume
+
   return (
-    <div className={`relative flex items-center justify-center ${className ?? ''}`}>
+    <div
+      className={`group relative flex items-center justify-center ${className ?? ''}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       {playlistUrl && <div ref={hostRef} className="h-full w-full" />}
       {!playing && (
         <div className="absolute inset-0 flex items-center justify-center gap-2 p-4 text-sm text-white/60">
           <LoaderCircle className="size-4 shrink-0 animate-spin" aria-hidden />
           <span>{loadingMessage ?? `Tuning into ${tuningLabel}`}</span>
+        </div>
+      )}
+      <div
+        className={`pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/75 via-black/30 to-transparent p-3 opacity-0 transition-opacity duration-150 ${hovered ? 'pointer-events-auto opacity-100' : ''}`}
+      >
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            className="bg-black/35 text-white hover:bg-black/50"
+            aria-label="Back 10 seconds"
+            onClick={() => seek(videoRef.current, -SEEK_BACKWARD_SECONDS)}
+          >
+            <SkipBack className="size-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            className="bg-black/35 text-white hover:bg-black/50"
+            aria-label={currentVideo?.paused ? 'Play' : 'Pause'}
+            onClick={() => {
+              const video = videoRef.current
+              if (!video) return
+              if (video.paused) play(video)
+              else video.pause()
+            }}
+          >
+            {currentVideo?.paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            className="bg-black/35 text-white hover:bg-black/50"
+            aria-label="Forward 30 seconds"
+            onClick={() => seek(videoRef.current, SEEK_FORWARD_SECONDS)}
+          >
+            <SkipForward className="size-4" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={currentVolume}
+            aria-label="Volume"
+            className="h-1.5 w-20 accent-white"
+            onChange={(event) => {
+              const video = videoRef.current
+              if (!video) return
+              applyVolume(video, Number(event.target.value))
+            }}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            className="bg-black/35 text-white hover:bg-black/50"
+            aria-label={isMuted ? 'Unmute' : 'Mute'}
+            onClick={() => toggleMute(videoRef.current)}
+          >
+            {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+          </Button>
+        </div>
+      </div>
+      {mediaTitle && (
+        <div className={`pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/65 via-black/30 to-transparent px-3 pt-3 pb-8 opacity-0 transition-opacity duration-150 ${hovered ? 'opacity-100' : ''}`}>
+          <div className="space-y-0.5 text-white drop-shadow-sm">
+            <p className="text-sm font-medium leading-tight">{mediaTitle}</p>
+            {mediaSubtitle && <p className="text-xs text-white/80">{mediaSubtitle}</p>}
+          </div>
         </div>
       )}
     </div>
