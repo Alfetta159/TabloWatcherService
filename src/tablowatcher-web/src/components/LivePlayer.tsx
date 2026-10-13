@@ -142,8 +142,14 @@ export function LivePlayer({
 
   const [hovered, setHovered] = useState(false)
   const [muted, setMuted] = useState(audioSettings.muted)
+  const [volume, setVolume] = useState(audioSettings.volume)
 
-  function updateMutedState(video: HTMLVideoElement) {
+  function applyVolume(video: HTMLVideoElement, nextVolume: number) {
+    const bounded = Math.min(1, Math.max(0, nextVolume))
+    video.volume = bounded
+    if (bounded === 0) video.muted = true
+    else if (video.muted && bounded > 0) video.muted = false
+    setVolume(video.volume)
     setMuted(video.muted)
     saveAudioSettings(video)
   }
@@ -152,7 +158,9 @@ export function LivePlayer({
     if (!video) return
     video.muted = !video.muted
     if (video.volume === 0 && !video.muted) video.volume = audioSettings.volume || 0.5
-    updateMutedState(video)
+    setVolume(video.volume)
+    setMuted(video.muted)
+    saveAudioSettings(video)
   }
 
   function seek(video: HTMLVideoElement | null, offsetSeconds: number) {
@@ -177,6 +185,7 @@ export function LivePlayer({
     video.muted = audioSettings.muted
     video.addEventListener('playing', () => setPlaying(true))
     video.addEventListener('volumechange', () => {
+      setVolume(video.volume)
       setMuted(video.muted)
       saveAudioSettings(video)
     })
@@ -283,8 +292,9 @@ export function LivePlayer({
     )
   }
 
-  const video = videoRef.current
-  const isMuted = video ? video.muted : muted
+  const currentVideo = videoRef.current
+  const isMuted = currentVideo ? currentVideo.muted : muted
+  const currentVolume = currentVideo ? currentVideo.volume : volume
 
   return (
     <div
@@ -309,7 +319,7 @@ export function LivePlayer({
             size="icon-sm"
             className="bg-black/35 text-white hover:bg-black/50"
             aria-label="Back 10 seconds"
-            onClick={() => seek(video, -SEEK_BACKWARD_SECONDS)}
+            onClick={() => seek(videoRef.current, -SEEK_BACKWARD_SECONDS)}
           >
             <SkipBack className="size-4" />
           </Button>
@@ -318,14 +328,15 @@ export function LivePlayer({
             variant="secondary"
             size="icon-sm"
             className="bg-black/35 text-white hover:bg-black/50"
-            aria-label={video?.paused ? 'Play' : 'Pause'}
+            aria-label={currentVideo?.paused ? 'Play' : 'Pause'}
             onClick={() => {
+              const video = videoRef.current
               if (!video) return
               if (video.paused) play(video)
               else video.pause()
             }}
           >
-            {video?.paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+            {currentVideo?.paused ? <Play className="size-4" /> : <Pause className="size-4" />}
           </Button>
           <Button
             type="button"
@@ -333,21 +344,37 @@ export function LivePlayer({
             size="icon-sm"
             className="bg-black/35 text-white hover:bg-black/50"
             aria-label="Forward 30 seconds"
-            onClick={() => seek(video, SEEK_FORWARD_SECONDS)}
+            onClick={() => seek(videoRef.current, SEEK_FORWARD_SECONDS)}
           >
             <SkipForward className="size-4" />
           </Button>
         </div>
-        <Button
-          type="button"
-          variant="secondary"
-          size="icon-sm"
-          className="bg-black/35 text-white hover:bg-black/50"
-          aria-label={isMuted ? 'Unmute' : 'Mute'}
-          onClick={() => toggleMute(video)}
-        >
-          {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
-        </Button>
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={currentVolume}
+            aria-label="Volume"
+            className="h-1.5 w-20 accent-white"
+            onChange={(event) => {
+              const video = videoRef.current
+              if (!video) return
+              applyVolume(video, Number(event.target.value))
+            }}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            className="bg-black/35 text-white hover:bg-black/50"
+            aria-label={isMuted ? 'Unmute' : 'Mute'}
+            onClick={() => toggleMute(videoRef.current)}
+          >
+            {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+          </Button>
+        </div>
       </div>
       {mediaTitle && (
         <div className={`pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/65 via-black/30 to-transparent px-3 pt-3 pb-8 opacity-0 transition-opacity duration-150 ${hovered ? 'opacity-100' : ''}`}>
