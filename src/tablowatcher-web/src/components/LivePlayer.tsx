@@ -159,11 +159,15 @@ export function LivePlayer({
     if (!container) return
 
     if (!document.fullscreenElement) {
-      container.requestFullscreen().catch(() => {})
+      container.requestFullscreen().catch((err) => {
+        console.error('Failed to enter fullscreen', err)
+      })
       return
     }
 
-    document.exitFullscreen().catch(() => {})
+    document.exitFullscreen().catch((err) => {
+      console.error('Failed to exit fullscreen', err)
+    })
   }
 
   function applyVolume(video: HTMLVideoElement, nextVolume: number) {
