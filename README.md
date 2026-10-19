@@ -129,55 +129,9 @@ Times are in the Tablo's own time zone.
 
 ### Installing on Linux
 
-#### From the package repository (recommended)
-
-Packages are published to [Cloudsmith](https://cloudsmith.io/~alfetta159/repos/tablo-watcher-service/),
-so your package manager can install and update Tabloid. Add the repository once:
-
-```bash
-# Debian, Ubuntu, Mint, Raspberry Pi OS
-curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/setup.deb.sh' | sudo -E bash
-```
-
-```bash
-# Fedora, openSUSE
-curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/setup.rpm.sh' | sudo -E bash
-```
-
-Then install it:
-
-```bash
-sudo apt update && sudo apt install tabloid
-```
-
-```bash
-sudo dnf install tabloid
-```
-
-If the setup script says it doesn't support your distribution (for example Zorin OS), tell
-it which one yours is based on. Zorin 18 is based on Ubuntu 24.04:
-
-```bash
-curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/setup.deb.sh' | distro=ubuntu version=24.04 codename=noble sudo -E bash
-```
-
-To add the repository to apt by hand instead of running the script, install its signing key
-and source list yourself. Change `distro` and `codename` to match your system (or the
-release yours is based on):
-
-```bash
-curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/gpg.key' \
-  | sudo gpg --dearmor -o /usr/share/keyrings/alfetta159-tablo-watcher-service-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/alfetta159/tablo-watcher-service/config.deb.txt?distro=ubuntu&codename=noble' \
-  | sudo tee /etc/apt/sources.list.d/alfetta159-tablo-watcher-service.list
-sudo apt update && sudo apt install tabloid
-```
-
-To remove the repository again, delete those two files and run `sudo apt update`.
-
 #### From a downloaded file
 
-Or download the package for your system from the
+Download the package for your system from the
 [Releases](https://github.com/Alfetta159/TabloWatcherService/releases) page: `.deb` for
 Debian, Ubuntu, Mint and Raspberry Pi OS; `.rpm` for Fedora and openSUSE. Pick `amd64` /
 `x86_64` for a typical PC, or `arm64` / `aarch64` for a 64-bit Raspberry Pi. Then install
