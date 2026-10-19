@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
-import { LoaderCircle, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { LoaderCircle, Maximize2, Minimize2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface LivePlayerProps {
@@ -143,6 +143,28 @@ export function LivePlayer({
   const [hovered, setHovered] = useState(false)
   const [muted, setMuted] = useState(audioSettings.muted)
   const [volume, setVolume] = useState(audioSettings.volume)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement))
+    }
+
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+
+  function toggleFullscreen() {
+    const container = hostRef.current
+    if (!container) return
+
+    if (!document.fullscreenElement) {
+      container.requestFullscreen().catch(() => {})
+      return
+    }
+
+    document.exitFullscreen().catch(() => {})
+  }
 
   function applyVolume(video: HTMLVideoElement, nextVolume: number) {
     const bounded = Math.min(1, Math.max(0, nextVolume))
@@ -373,6 +395,16 @@ export function LivePlayer({
             onClick={() => toggleMute(videoRef.current)}
           >
             {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            className="bg-black/35 text-white hover:bg-black/50"
+            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
           </Button>
         </div>
       </div>
