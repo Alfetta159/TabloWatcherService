@@ -336,7 +336,7 @@ export function LivePlayer({
         </div>
       )}
       <div
-        className={`pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/75 via-black/30 to-transparent p-3 opacity-0 transition-opacity duration-150 ${hovered ? 'pointer-events-auto opacity-100' : ''}`}
+        className={`absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/75 via-black/30 to-transparent p-3 opacity-0 transition-opacity duration-150 ${hovered ? 'opacity-100' : ''}`}
       >
         <div className="flex items-center gap-2">
           <Button
