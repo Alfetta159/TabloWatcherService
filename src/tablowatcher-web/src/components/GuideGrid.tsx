@@ -70,6 +70,17 @@ export interface SelectedProgram {
 export interface WatchedChannel {
   objectId: number
   tuningLabel: string
+  channelLabel: string
+}
+
+function channelLabelFor(c: GridChannel): string {
+  const { major, minor, callSign } = c.channel.channel
+  const parts: string[] = []
+  if (major != null && minor != null) {
+    parts.push(`${major}.${minor}`)
+  }
+  if (callSign) parts.push(callSign)
+  return parts.join(' ')
 }
 
 function airingKey(a: GridAiring): string {
@@ -393,7 +404,11 @@ export function GuideGrid({ onSelect, onWatchChannel, tunerByChannel, channels }
                   setSelectedChannelId(c.channel.objectId)
                   setSelectedKey(null)
                   onSelect?.(selectionForChannel(c, noListings))
-                  onWatchChannel?.({ objectId: c.channel.objectId, tuningLabel: tuningLabelFor(c) })
+                  onWatchChannel?.({
+                    objectId: c.channel.objectId,
+                    tuningLabel: tuningLabelFor(c),
+                    channelLabel: channelLabelFor(c),
+                  })
                 }}
               >
                 <div className="flex items-center gap-2">
