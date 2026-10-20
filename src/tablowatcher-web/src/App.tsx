@@ -483,6 +483,7 @@ function App() {
                     key={watchedChannel?.objectId}
                     playlistUrl={playlistUrl}
                     tuningLabel={watchedChannel?.tuningLabel ?? null}
+                    channelLabel={watchedChannel?.channelLabel ?? null}
                     mediaTitle={selectedProgram?.title ?? null}
                     mediaSubtitle={selectedProgram?.subtitle ?? null}
                     tuneError={tuneError}

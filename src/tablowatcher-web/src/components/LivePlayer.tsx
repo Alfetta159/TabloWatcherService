@@ -7,6 +7,7 @@ interface LivePlayerProps {
   playlistUrl: string | null
   // Set once a channel has been picked (e.g. "3.2 Me-TV M*A*S*H"); shown until playback starts.
   tuningLabel: string | null
+  channelLabel?: string | null
   mediaTitle?: string | null
   mediaSubtitle?: string | null
   tuneError?: string | null
@@ -125,6 +126,7 @@ function endDetached() {
 export function LivePlayer({
   playlistUrl,
   tuningLabel,
+  channelLabel,
   mediaTitle,
   mediaSubtitle,
   tuneError,
@@ -412,10 +414,11 @@ export function LivePlayer({
           </Button>
         </div>
       </div>
-      {mediaTitle && (
+      {(mediaTitle || channelLabel || mediaSubtitle) && (
         <div className={`pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/65 via-black/30 to-transparent px-3 pt-3 pb-8 opacity-0 transition-opacity duration-150 ${hovered ? 'opacity-100' : ''}`}>
-          <div className="space-y-0.5 text-white drop-shadow-sm">
-            <p className="text-sm font-medium leading-tight">{mediaTitle}</p>
+          <div className="space-y-0.5 text-left text-white drop-shadow-sm">
+            {channelLabel && <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/70">{channelLabel}</p>}
+            {mediaTitle && <p className="text-sm font-medium leading-tight">{mediaTitle}</p>}
             {mediaSubtitle && <p className="text-xs text-white/80">{mediaSubtitle}</p>}
           </div>
         </div>
