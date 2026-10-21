@@ -85,6 +85,19 @@ function seekBy(video: HTMLVideoElement, offsetSeconds: number) {
   seekTo(video, video.currentTime + offsetSeconds)
 }
 
+function formatClock(totalSeconds: number) {
+  const safeSeconds = Number.isFinite(totalSeconds) ? Math.max(0, totalSeconds) : 0
+  const hours = Math.floor(safeSeconds / 3600)
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+  const seconds = Math.floor(safeSeconds % 60)
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+}
+
 // Unmuted autoplay can be refused (browser autoplay policy); fall back to muted rather than
 // not playing at all.
 function play(video: HTMLVideoElement) {
@@ -146,6 +159,7 @@ export function LivePlayer({
   const [muted, setMuted] = useState(audioSettings.muted)
   const [volume, setVolume] = useState(audioSettings.volume)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [timeline, setTimeline] = useState({ currentTime: 0, duration: 0 })
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -212,6 +226,13 @@ export function LivePlayer({
     video.volume = audioSettings.volume
     video.muted = audioSettings.muted
     video.addEventListener('playing', () => setPlaying(true))
+    video.addEventListener('pause', () => setPlaying(false))
+    video.addEventListener('timeupdate', () => {
+      setTimeline({ currentTime: video.currentTime, duration: Number.isFinite(video.duration) ? video.duration : 0 })
+    })
+    video.addEventListener('loadedmetadata', () => {
+      setTimeline({ currentTime: video.currentTime, duration: Number.isFinite(video.duration) ? video.duration : 0 })
+    })
     video.addEventListener('volumechange', () => {
       setVolume(video.volume)
       setMuted(video.muted)
@@ -323,6 +344,9 @@ export function LivePlayer({
   const currentVideo = videoRef.current
   const isMuted = currentVideo ? currentVideo.muted : muted
   const currentVolume = currentVideo ? currentVideo.volume : volume
+  const progressValue = currentVideo && Number.isFinite(currentVideo.duration) ?
+    Math.min(1, Math.max(0, currentVideo.currentTime / currentVideo.duration)) :
+    0
 
   return (
     <div
@@ -338,80 +362,107 @@ export function LivePlayer({
         </div>
       )}
       <div
-        className={`absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/75 via-black/30 to-transparent p-3 opacity-0 transition-opacity duration-150 ${hovered ? 'opacity-100' : ''}`}
+        className={`absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-black/75 via-black/30 to-transparent p-3 opacity-0 transition-opacity duration-150 ${hovered ? 'opacity-100' : ''}`}
       >
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon-sm"
-            className="bg-black/35 text-white hover:bg-black/50"
-            aria-label="Back 10 seconds"
-            onClick={() => seek(videoRef.current, -SEEK_BACKWARD_SECONDS)}
-          >
-            <SkipBack className="size-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon-sm"
-            className="bg-black/35 text-white hover:bg-black/50"
-            aria-label={currentVideo?.paused ? 'Play' : 'Pause'}
-            onClick={() => {
-              const video = videoRef.current
-              if (!video) return
-              if (video.paused) play(video)
-              else video.pause()
-            }}
-          >
-            {currentVideo?.paused ? <Play className="size-4" /> : <Pause className="size-4" />}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon-sm"
-            className="bg-black/35 text-white hover:bg-black/50"
-            aria-label="Forward 30 seconds"
-            onClick={() => seek(videoRef.current, SEEK_FORWARD_SECONDS)}
-          >
-            <SkipForward className="size-4" />
-          </Button>
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-[10px] font-medium text-white/70">
+            <span className="min-w-0 truncate">{mediaTitle ?? tuningLabel}</span>
+            {mediaSubtitle && <span className="shrink-0 text-white/55">{mediaSubtitle}</span>}
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-white/75">
+            <span>{formatClock(timeline.currentTime)}</span>
+            {timeline.duration > 0 && <span>/</span>}
+            {timeline.duration > 0 && <span>{formatClock(timeline.duration)}</span>}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={currentVolume}
-            aria-label="Volume"
-            className="h-1.5 w-20 accent-white"
-            onChange={(event) => {
-              const video = videoRef.current
-              if (!video) return
-              applyVolume(video, Number(event.target.value))
-            }}
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon-sm"
-            className="bg-black/35 text-white hover:bg-black/50"
-            aria-label={isMuted ? 'Unmute' : 'Mute'}
-            onClick={() => toggleMute(videoRef.current)}
-          >
-            {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon-sm"
-            className="bg-black/35 text-white hover:bg-black/50"
-            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-            onClick={toggleFullscreen}
-          >
-            {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-          </Button>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              className="bg-black/35 text-white hover:bg-black/50"
+              aria-label="Back 10 seconds"
+              onClick={() => seek(videoRef.current, -SEEK_BACKWARD_SECONDS)}
+            >
+              <SkipBack className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              className="bg-black/35 text-white hover:bg-black/50"
+              aria-label={currentVideo?.paused ? 'Play' : 'Pause'}
+              onClick={() => {
+                const video = videoRef.current
+                if (!video) return
+                if (video.paused) play(video)
+                else video.pause()
+              }}
+            >
+              {currentVideo?.paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              className="bg-black/35 text-white hover:bg-black/50"
+              aria-label="Forward 30 seconds"
+              onClick={() => seek(videoRef.current, SEEK_FORWARD_SECONDS)}
+            >
+              <SkipForward className="size-4" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={progressValue}
+              aria-label="Seek"
+              className="h-1.5 w-28 accent-white"
+              onChange={(event) => {
+                const video = videoRef.current
+                if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return
+                seekTo(video, Number(event.target.value) * video.duration)
+              }}
+            />
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={currentVolume}
+              aria-label="Volume"
+              className="h-1.5 w-20 accent-white"
+              onChange={(event) => {
+                const video = videoRef.current
+                if (!video) return
+                applyVolume(video, Number(event.target.value))
+              }}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              className="bg-black/35 text-white hover:bg-black/50"
+              aria-label={isMuted ? 'Unmute' : 'Mute'}
+              onClick={() => toggleMute(videoRef.current)}
+            >
+              {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              className="bg-black/35 text-white hover:bg-black/50"
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              onClick={toggleFullscreen}
+            >
+              {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            </Button>
+          </div>
         </div>
       </div>
       {(mediaTitle || channelLabel || mediaSubtitle) && (
