@@ -27,6 +27,7 @@ public class CurrentTabloDeviceResolver(
     // of requests - re-asking the association server for each burns through its rate limit
     // (starving the frontend's own /api/servers call), so reuse a recent answer.
     private static readonly TimeSpan LookupCacheDuration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan OnlineThreshold = TimeSpan.FromMinutes(5);
     private DateTimeOffset _lastLookup = DateTimeOffset.MinValue;
 
     public async Task<ITabloDeviceClient?> ResolveAsync()
@@ -39,11 +40,16 @@ public class CurrentTabloDeviceResolver(
         var recordersResponse = await associationServerClient.GetRecordersAsync();
         if (recordersResponse.IsSuccessful)
         {
-            _lastKnownIp = recordersResponse.Content?.Recorders.FirstOrDefault()?.PrivateIp;
+            var liveRecorder = recordersResponse.Content?.Recorders
+                .Where(r => !string.IsNullOrWhiteSpace(r.PrivateIp) && r.IsOnline(OnlineThreshold))
+                .OrderBy(r => r.Name)
+                .FirstOrDefault();
+
+            _lastKnownIp = liveRecorder?.PrivateIp;
             _lastLookup = DateTimeOffset.UtcNow;
             if (_lastKnownIp is null)
             {
-                logger.LogWarning("The association server returned no Tablo servers");
+                logger.LogWarning("The association server returned no live Tablo servers");
             }
         }
         else
