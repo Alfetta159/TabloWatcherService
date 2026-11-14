@@ -15,4 +15,18 @@ public class Recorder
     public DateTime Modified { get; set; }
     public DateTime Inserted { get; set; }
     public bool Relay { get; set; }
+
+    public bool IsOnline(TimeSpan staleAfter)
+    {
+        if (LastSeen == default) return false;
+
+        var seen = LastSeen.Kind switch
+        {
+            DateTimeKind.Utc => LastSeen,
+            DateTimeKind.Local => LastSeen.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(LastSeen, DateTimeKind.Utc),
+        };
+
+        return DateTime.UtcNow - seen < staleAfter;
+    }
 }

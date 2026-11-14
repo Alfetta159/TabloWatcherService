@@ -6,6 +6,8 @@ namespace TabloWatcherService.Api.Controllers;
 [Route("api/[controller]")]
 public class ServersController(IAssociationServerClient associationServerClient) : LoggedControllerBase
 {
+    private static readonly TimeSpan OnlineThreshold = TimeSpan.FromMinutes(5);
+
     [HttpGet]
     public async Task<IActionResult> Get()
     {
@@ -15,6 +17,11 @@ public class ServersController(IAssociationServerClient associationServerClient)
             return LogFailure(response.ToErrorResult());
         }
 
-        return Ok(response.Content?.Recorders);
+        var activeRecorders = response.Content?.Recorders
+            .Where(r => !string.IsNullOrWhiteSpace(r.PrivateIp) && r.IsOnline(OnlineThreshold))
+            .OrderBy(r => r.Name)
+            .ToArray();
+
+        return Ok(activeRecorders ?? []);
     }
 }
