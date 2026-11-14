@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'reac
 import { HardDrive as HardDriveIcon, TriangleAlert } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChannelsTab } from '@/components/ChannelsTab'
 import { DeleteRecordingsDialog, type StoredRecording } from '@/components/DeleteRecordingsDialog'
+import { RecordedShowDialog } from '@/components/RecordedShowDialog'
+import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog'
 import { formatSize } from '@/lib/format'
 
 // GET /server/harddrives on the device, via /api/storage/hard-drives. Sizes are bytes.
@@ -28,6 +31,7 @@ type Kind = 'tv' | 'movie' | 'sport' | 'program'
 interface UsageItem {
   kind: Kind
   label: string
+  path: string | null
   size: number
   recordingCount: number
   // Each recording - movies and sports only.
@@ -245,6 +249,7 @@ interface Slice {
   key: string
   category: Category
   label: string
+  path: string | null
   size: number
   recordingCount: number
   // Set for a movie or sport - which can be opened to delete its recordings.
@@ -258,8 +263,10 @@ const MIN_SLICE_ANGLE = (3 * Math.PI) / 180
 
 function RecordingUsage({ items, onChanged }: { items: UsageItem[]; onChanged: () => void }) {
   const [hovered, setHovered] = useState<string | null>(null)
-  // The movie or sport whose recordings are open to delete.
+  // The movie/sport or show whose recordings are open to watch/delete.
   const [opened, setOpened] = useState<Slice | null>(null)
+  const [openMovieOrSport, setOpenMovieOrSport] = useState<{ kind: 'movie' | 'sport'; path: string } | null>(null)
+  const [openShow, setOpenShow] = useState<{ kind: 'tv' | 'program'; path: string } | null>(null)
   const [filter, setFilter] = useState<Category | null>(null)
   const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null)
 
@@ -280,6 +287,7 @@ function RecordingUsage({ items, onChanged }: { items: UsageItem[]; onChanged: (
           key,
           category,
           label: item.label,
+          path: item.path,
           size: item.size,
           recordingCount: item.recordingCount,
           recordings: item.recordings,
@@ -351,6 +359,15 @@ function RecordingUsage({ items, onChanged }: { items: UsageItem[]; onChanged: (
 
   const shownRows = filter ? listed.filter((s) => s.category === filter) : listed
   const tooltipItem = hoveredSlice ?? (hoveredCategory && { label: hoveredCategory.label, size: hoveredCategory.size })
+
+  function openSlice(slice: Slice) {
+    if (!slice.path) return
+    if (slice.category === 'tv') {
+      setOpenShow({ kind: 'program', path: slice.path })
+      return
+    }
+    setOpenMovieOrSport({ kind: slice.category as 'movie' | 'sport', path: slice.path })
+  }
 
   return (
     <div className="flex flex-wrap gap-8">
