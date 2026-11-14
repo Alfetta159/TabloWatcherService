@@ -49,33 +49,39 @@ public class StorageController(IRecordingsStore recordings, ICurrentTabloDeviceR
             .GroupBy(g => (g.Kind, Label: g.Kind == RecordingKinds.Sport
                 ? g.Sport?.Genres?.FirstOrDefault() ?? g.Sport?.Title ?? "Other sports"
                 : g.Title))
-            .Select(g => new
+            .Select(g =>
             {
-                kind = g.Key.Kind,
-                label = g.Key.Label,
-                size = g.Sum(group => group.Recordings.Sum(r => r.VideoDetails?.Size ?? 0)),
-                recordingCount = g.Sum(group => group.Recordings.Count),
-                // Each recording, so a movie's or sport's can be picked out to delete. Not
-                // for TV - a series can run to hundreds of episodes.
-                recordings = g.Key.Kind is RecordingKinds.Movie or RecordingKinds.Sport
-                    ? g.SelectMany(group => group.Recordings.Select(r => new
-                        {
-                            path = r.Path,
-                            // The game ("Yankees at Red Sox") or the movie.
-                            title = group.Title,
-                            // The competition ("MLB Baseball"), or the movie's release year.
-                            subtitle = group.Sport?.Title
-                                ?? (r.MovieAiring?.ReleaseYear is > 0 ? r.MovieAiring.ReleaseYear.ToString() : null),
-                            recordedAt = r.AiringDetails.Datetime,
-                            channel = UpcomingResponses.Channel(r.AiringDetails.Channel),
-                            state = r.VideoDetails?.State,
-                            duration = r.VideoDetails?.Duration ?? 0,
-                            size = r.VideoDetails?.Size ?? 0,
-                            watched = r.UserInfo?.Watched ?? false,
-                        }))
-                        .OrderByDescending(r => r.recordedAt)
-                        .ToList()
-                    : null,
+                var paths = g.Select(group => group.Key).Distinct().ToArray();
+                var path = paths.Length == 1 ? paths[0] : null;
+                return new
+                {
+                    kind = g.Key.Kind,
+                    label = g.Key.Label,
+                    path,
+                    size = g.Sum(group => group.Recordings.Sum(r => r.VideoDetails?.Size ?? 0)),
+                    recordingCount = g.Sum(group => group.Recordings.Count),
+                    // Each recording, so a movie's or sport's can be picked out to delete. Not
+                    // for TV - a series can run to hundreds of episodes.
+                    recordings = g.Key.Kind is RecordingKinds.Movie or RecordingKinds.Sport
+                        ? g.SelectMany(group => group.Recordings.Select(r => new
+                            {
+                                path = r.Path,
+                                // The game ("Yankees at Red Sox") or the movie.
+                                title = group.Title,
+                                // The competition ("MLB Baseball"), or the movie's release year.
+                                subtitle = group.Sport?.Title
+                                    ?? (r.MovieAiring?.ReleaseYear is > 0 ? r.MovieAiring.ReleaseYear.ToString() : null),
+                                recordedAt = r.AiringDetails.Datetime,
+                                channel = UpcomingResponses.Channel(r.AiringDetails.Channel),
+                                state = r.VideoDetails?.State,
+                                duration = r.VideoDetails?.Duration ?? 0,
+                                size = r.VideoDetails?.Size ?? 0,
+                                watched = r.UserInfo?.Watched ?? false,
+                            }))
+                            .OrderByDescending(r => r.recordedAt)
+                            .ToList()
+                        : null,
+                };
             })
             .Where(item => item.size > 0)
             .OrderByDescending(item => item.size),
