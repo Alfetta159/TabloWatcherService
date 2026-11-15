@@ -152,6 +152,7 @@ function RecordingCard({
   description,
   imageId,
   pill,
+  extraPill,
   lines,
   genres,
   onOpen,
@@ -161,6 +162,7 @@ function RecordingCard({
   description: string | null
   imageId: number | null
   pill: ReactNode
+  extraPill?: ReactNode
   lines: Array<string | ReactNode>
   genres: string[]
   // Makes the card clickable (and keyboard-activatable).
@@ -199,7 +201,10 @@ function RecordingCard({
             {title}
           </div>
         )}
-        {pill && <div className="absolute top-2 right-2">{pill}</div>}
+        <div className="absolute inset-x-2 top-2 flex items-center justify-between gap-2">
+          {extraPill && <div className="flex-1">{extraPill}</div>}
+          {pill && <div className="ml-auto">{pill}</div>}
+        </div>
       </div>
       <div className="space-y-1 p-3 text-sm">
         <p className="line-clamp-2 font-medium leading-snug">{title}</p>
@@ -367,6 +372,11 @@ export function RecordingsPage() {
                     description={group.description}
                     imageId={posterImageId(group, group.snapshotImageId)}
                     pill={group.inProgress && <RecordingNowPill />}
+                    extraPill={
+                      group.kind === 'tv' && group.unwatchedCount > 0 ? (
+                        <Badge className="bg-foreground text-background shadow-sm">{group.unwatchedCount} unwatched</Badge>
+                      ) : undefined
+                    }
                     lines={recordedLines(group)}
                     genres={group.genres}
                     onOpen={
