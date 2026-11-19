@@ -13,6 +13,7 @@ import { SchedulePage } from '@/components/SchedulePage'
 import type { ChannelInfo } from '@/components/PosterGridPage'
 import { compareTitles, formatSize } from '@/lib/format'
 import type { RecordingState } from '@/lib/recording'
+import { withDevice } from '@/lib/device'
 
 type Kind = 'tv' | 'movie' | 'sport' | 'program'
 
@@ -189,7 +190,7 @@ function RecordingCard({
       <div className="bg-muted relative flex aspect-[2/3] items-center justify-center">
         {imageId != null && !imageFailed ? (
           <img
-            src={`/api/images/${imageId}`}
+            src={withDevice(`/api/images/${imageId}`)}
             alt=""
             loading="lazy"
             className="h-full w-full object-cover"

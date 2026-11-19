@@ -4,68 +4,34 @@ using TabloWatcherService.Api.Services;
 namespace TabloWatcherService.Api.Services.Tablo;
 
 /// <summary>
-/// Periodically rebuilds the guide grid and search index (<see cref="IAiringsStore"/>) from
-/// the first Tablo server the association server knows about: GET /guide/airings for the
+/// Periodically rebuilds each online Tablo's guide grid and search index (its
+/// <see cref="TabloDevice.Airings"/>): GET /guide/airings for the
 /// list of airing paths, then POST /batch in sequential chunks to hydrate them (and then the
 /// series, movies and sports they belong to), mirroring the
 /// tablo-legacy-m3u Python project's approach to building an EPG from the same API. Unlike
 /// that Python client, batches run one at a time - see <see cref="TabloBatch"/>.
 /// </summary>
 public class AiringsRefreshService(
-    ICurrentTabloDeviceResolver deviceResolver,
-    IAiringsStore store,
-    KeywordRecordingService keywordRecordings,
+    ITabloDeviceRegistry registry,
     IConfiguration configuration,
-    ILogger<AiringsRefreshService> logger) : BackgroundService
+    ILogger<AiringsRefreshService> logger) : PerDeviceRefreshService(registry, logger)
 {
-    // After a failed refresh (e.g. the association server rate-limiting us at startup),
-    // try again soon rather than leaving the guide empty for a whole refresh interval.
-    private static readonly TimeSpan FailedRefreshRetryInterval = TimeSpan.FromMinutes(1);
+    protected override string What => "guide grid";
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override TimeSpan Interval =>
+        TimeSpan.FromMinutes(configuration.GetValue("Tablo:AiringsRefreshIntervalMinutes", 15));
+
+    protected override async Task<bool> RefreshAsync(TabloDevice device, ITabloDeviceClient client, CancellationToken cancellationToken)
     {
-        var interval = TimeSpan.FromMinutes(configuration.GetValue("Tablo:AiringsRefreshIntervalMinutes", 15));
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            var succeeded = false;
-            try
-            {
-                succeeded = await RefreshAsync(stoppingToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, "Failed to refresh the guide grid");
-            }
-
-            var delay = succeeded ? interval : FailedRefreshRetryInterval;
-            if (!succeeded)
-            {
-                logger.LogInformation("Retrying guide grid refresh in {Delay}", delay);
-            }
-
-            await Task.Delay(delay, stoppingToken);
-        }
-    }
-
-    private async Task<bool> RefreshAsync(CancellationToken cancellationToken)
-    {
-        var client = await deviceResolver.ResolveAsync();
-        if (client is null)
-        {
-            logger.LogWarning("Couldn't resolve a Tablo device; skipping guide grid refresh");
-            return false;
-        }
-
         var pathsResponse = await client.GetGuideAiringsAsync();
         if (!pathsResponse.IsSuccessStatusCode || pathsResponse.Content is null)
         {
-            logger.LogWarning("Couldn't fetch guide airings: {Status}", pathsResponse.StatusCode);
+            logger.LogWarning("Couldn't fetch guide airings from {Device}: {Status}", device.Name, pathsResponse.StatusCode);
             return false;
         }
 
         var paths = pathsResponse.Content;
-        logger.LogInformation("Found {Count} airing paths", paths.Length);
+        logger.LogInformation("Found {Count} airing paths on {Device}", paths.Length, device.Name);
 
         var (airings, failedChunks) = await TabloBatch.FetchAsync<Airing>(client, paths, logger, cancellationToken);
 
@@ -80,13 +46,14 @@ public class AiringsRefreshService(
         var (sports, failedSportChunks) = await TabloBatch.FetchAsync<GuideSport>(
             client, DistinctPaths(airings, a => a.SportPath), logger, cancellationToken);
 
-        store.Replace(airings, new GuideDetails(
+        device.Airings.Replace(airings, new GuideDetails(
             ToDictionaryByPath(series, s => s.Path),
             ToDictionaryByPath(movies, m => m.Path),
             ToDictionaryByPath(sports, s => s.Path)));
 
         logger.LogInformation(
-            "Refreshed guide grid: {AiringCount} airings across {ChannelCount} channels, {SeriesCount} series, {MovieCount} movies, {SportCount} sports ({FailedChunks} chunk(s) failed after retries)",
+            "Refreshed guide grid for {Device}: {AiringCount} airings across {ChannelCount} channels, {SeriesCount} series, {MovieCount} movies, {SportCount} sports ({FailedChunks} chunk(s) failed after retries)",
+            device.Name,
             airings.Count,
             airings.Select(a => a.AiringDetails.Channel.ObjectId).Distinct().Count(),
             series.Count,
@@ -98,11 +65,11 @@ public class AiringsRefreshService(
         // refresh; they don't make this one a failure.
         try
         {
-            await keywordRecordings.ApplyAsync(cancellationToken: cancellationToken);
+            await device.KeywordRecordings.ApplyAsync(cancellationToken: cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogError(ex, "Failed to apply keyword recordings");
+            logger.LogError(ex, "Failed to apply keyword recordings on {Device}", device.Name);
         }
 
         return true;

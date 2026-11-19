@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import {
   CalendarClock,
   Disc3,
@@ -25,6 +25,7 @@ import { APP_VERSION, useServerVersion } from '@/hooks/useServerVersion'
 import { SearchPage } from '@/components/SearchPage'
 import { SettingsPage } from '@/components/SettingsPage'
 import { MoviesPage, SportsPage, TvShowsPage } from '@/components/UpcomingPages'
+import { rememberDevice, rememberedDevice, setCurrentDevice } from '@/lib/device'
 import { formatDuration } from '@/lib/format'
 
 interface NavItem {
@@ -121,10 +122,21 @@ function assignTuners(current: Record<number, number>, assignments: TunerAssignm
   return next
 }
 
-function App() {
-  const [servers, setServers] = useState<Recorder[]>([])
-  const [selectedServerId, setSelectedServerId] = useState('')
-  const [selectedNav, setSelectedNav] = useState<string>(NAV_ITEMS[0].label)
+// The whole UI for one Tablo. Remounted (see App) when another device is selected, so no page
+// keeps showing - or acting on - the previous device's data.
+function DeviceApp({
+  servers,
+  selectedServerId,
+  onSelectServer,
+  selectedNav,
+  setSelectedNav,
+}: {
+  servers: Recorder[]
+  selectedServerId: string
+  onSelectServer: (serverId: string) => void
+  selectedNav: string
+  setSelectedNav: Dispatch<SetStateAction<string>>
+}) {
   // Leaving a guide page for Live TV when it's hidden from under you.
   const hasListings = useGuideListings(() =>
     setSelectedNav((nav) => (GUIDE_LISTING_NAV.has(nav) ? NAV_ITEMS[0].label : nav)),
@@ -165,41 +177,6 @@ function App() {
     return () => {
       cancelled = true
       clearInterval(interval)
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    let retry: ReturnType<typeof setTimeout> | undefined
-
-    function load() {
-      fetch('/api/servers')
-        .then((res) => {
-          if (!res.ok) throw new Error(`API returned ${res.status}`)
-          return res.json() as Promise<Recorder[]>
-        })
-        .then((data) => {
-          if (cancelled) return
-          setServers(data)
-          // Keep the current tab while its device is still listed; otherwise fall back to the
-          // first one (or none), so a device that went offline doesn't stay selected.
-          setSelectedServerId((current) =>
-            data.some((s) => s.serverid === current) ? current : (data[0]?.serverid ?? ''),
-          )
-          retry = setTimeout(load, SERVERS_POLL_INTERVAL_MS)
-        })
-        .catch(() => {
-          if (cancelled) return
-          // Keep showing the last known list; a failed poll isn't evidence a device is gone.
-          retry = setTimeout(load, LOAD_RETRY_INTERVAL_MS)
-        })
-    }
-
-    load()
-
-    return () => {
-      cancelled = true
-      clearTimeout(retry)
     }
   }, [])
 
@@ -349,7 +326,7 @@ function App() {
   return (
     <Tabs
       value={selectedServerId}
-      onValueChange={setSelectedServerId}
+      onValueChange={onSelectServer}
       className="flex h-screen flex-col gap-0 bg-background"
     >
       <header className="flex items-center gap-4 border-b px-6 py-3">
@@ -551,6 +528,68 @@ function App() {
         </main>
       </div>
     </Tabs>
+  )
+}
+
+function App() {
+  const [servers, setServers] = useState<Recorder[]>([])
+  // Back to the device this browser showed last; replaced once the server list loads if
+  // that one isn't online.
+  const [selectedServerId, setSelectedServerId] = useState(rememberedDevice)
+  // Lives here, not in DeviceApp, so switching devices stays on the same page.
+  const [selectedNav, setSelectedNav] = useState<string>(NAV_ITEMS[0].label)
+
+  // During render, not in an effect: DeviceApp's children fetch from their own effects, which
+  // run before this component's - they must already see the new device.
+  setCurrentDevice(selectedServerId)
+
+  useEffect(() => {
+    let cancelled = false
+    let retry: ReturnType<typeof setTimeout> | undefined
+
+    function load() {
+      fetch('/api/servers')
+        .then((res) => {
+          if (!res.ok) throw new Error(`API returned ${res.status}`)
+          return res.json() as Promise<Recorder[]>
+        })
+        .then((data) => {
+          if (cancelled) return
+          setServers(data)
+          // Keep the current tab while its device is still listed; otherwise fall back to the
+          // first one (or none), so a device that went offline doesn't stay selected.
+          setSelectedServerId((current) =>
+            data.some((s) => s.serverid === current) ? current : (data[0]?.serverid ?? ''),
+          )
+          retry = setTimeout(load, SERVERS_POLL_INTERVAL_MS)
+        })
+        .catch(() => {
+          if (cancelled) return
+          // Keep showing the last known list; a failed poll isn't evidence a device is gone.
+          retry = setTimeout(load, LOAD_RETRY_INTERVAL_MS)
+        })
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+      clearTimeout(retry)
+    }
+  }, [])
+
+  return (
+    <DeviceApp
+      key={selectedServerId}
+      servers={servers}
+      selectedServerId={selectedServerId}
+      onSelectServer={(serverId) => {
+        rememberDevice(serverId)
+        setSelectedServerId(serverId)
+      }}
+      selectedNav={selectedNav}
+      setSelectedNav={setSelectedNav}
+    />
   )
 }
 

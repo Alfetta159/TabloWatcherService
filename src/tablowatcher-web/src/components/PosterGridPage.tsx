@@ -10,6 +10,7 @@ import { useDeviceChannels } from '@/hooks/useDeviceChannels'
 import { useTagFilters } from '@/hooks/useTagFilters'
 import { compareTitles } from '@/lib/format'
 import type { RecordingState } from '@/lib/recording'
+import { withDevice } from '@/lib/device'
 
 // A channel as the TV shows/movies/sports endpoints return it (UpcomingResponses on the server).
 export interface ChannelInfo {
@@ -133,7 +134,7 @@ function PosterCard({
       <div className="bg-muted relative flex aspect-[2/3] items-center justify-center">
         {card.imageId != null && !imageFailed ? (
           <img
-            src={`/api/images/${card.imageId}`}
+            src={withDevice(`/api/images/${card.imageId}`)}
             alt=""
             loading="lazy"
             className="h-full w-full object-cover"

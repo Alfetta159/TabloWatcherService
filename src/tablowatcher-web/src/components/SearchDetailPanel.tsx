@@ -7,6 +7,7 @@ import { Genres, Section } from '@/components/DetailDialogs'
 import { AiringRow } from '@/components/Recording'
 import { formatClock, formatDuration, formatRating, formatSize, formatStars } from '@/lib/format'
 import type { ScheduledAiring } from '@/lib/recording'
+import { withDevice } from '@/lib/device'
 
 // GET /api/search/details.
 interface SearchResultDetail {
@@ -48,7 +49,7 @@ interface SearchResultDetail {
 }
 
 function imageUrl(id: number | null): string | null {
-  return id == null ? null : `/api/images/${id}`
+  return id == null ? null : withDevice(`/api/images/${id}`)
 }
 
 // "2019-03-05" -> "Mar 5, 2019", read as a local date (new Date() would take it as UTC
