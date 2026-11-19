@@ -57,8 +57,11 @@ if (builder.Environment.IsDevelopment())
 builder.Services.AddSingleton<ITabloDeviceClientFactory>(serviceProvider =>
     new TabloDeviceClientFactory(serviceProvider.GetRequiredService<IHttpClientFactory>(), tabloRefitSettings));
 
-// Resolves "the" Tablo device (the first the association server knows about) for
-// features scoped to a single device: the guide grid and its background images.
+// Which Tablo devices are online: listed by the association server, confirmed by asking each
+// one directly (its last_seen there isn't a reliable liveness signal). Backs /api/servers.
+builder.Services.AddSingleton<ITabloDeviceDiscovery, TabloDeviceDiscovery>();
+// Resolves "the" Tablo device (the first online one) for features scoped to a single
+// device: the guide grid and its background images.
 builder.Services.AddSingleton<ICurrentTabloDeviceResolver, CurrentTabloDeviceResolver>();
 // Every channel list and dropdown reads the device's channels through this (cached briefly).
 builder.Services.AddSingleton<IDeviceChannels, DeviceChannels>();
