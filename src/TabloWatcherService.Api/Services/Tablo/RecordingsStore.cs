@@ -89,14 +89,18 @@ public class RecordingsStore : IRecordingsStore
 
     private readonly string? _devCachePath;
 
-    public RecordingsStore(IHostEnvironment environment)
+    /// <param name="deviceId">
+    /// The Tablo this store holds the recordings of (its server id) - names its dev cache file.
+    /// Null for a store that never holds data (no device online), which has no cache file.
+    /// </param>
+    public RecordingsStore(IHostEnvironment environment, string? deviceId)
     {
-        if (!environment.IsDevelopment())
+        if (!environment.IsDevelopment() || deviceId is null)
         {
             return;
         }
 
-        _devCachePath = Path.Combine(environment.ContentRootPath, "dev-recordings-cache.json");
+        _devCachePath = Path.Combine(environment.ContentRootPath, $"dev-recordings-cache.{deviceId}.json");
         if (DevCache.Load<CachedRecordings>(_devCachePath) is { } cached)
         {
             BuildSnapshot(cached.Recordings, cached.Parents);

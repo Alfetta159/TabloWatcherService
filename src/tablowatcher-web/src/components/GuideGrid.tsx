@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CardContent } from '@/components/ui/card'
 import type { AiringSchedule } from '@/lib/recording'
+import { withDevice } from '@/lib/device'
 
 interface ChannelDetails {
   callSign: string
@@ -140,8 +141,8 @@ function tuningLabelFor(c: GridChannel): string {
 }
 
 function artworkUrlFor(kind: 'background' | 'thumbnail', a: GridAiring): string | null {
-  if (a.moviePath) return `/api/images/${kind}?moviePath=${encodeURIComponent(a.moviePath)}`
-  if (a.seriesPath) return `/api/images/${kind}?seriesPath=${encodeURIComponent(a.seriesPath)}`
+  if (a.moviePath) return withDevice(`/api/images/${kind}?moviePath=${encodeURIComponent(a.moviePath)}`)
+  if (a.seriesPath) return withDevice(`/api/images/${kind}?seriesPath=${encodeURIComponent(a.seriesPath)}`)
   return null
 }
 

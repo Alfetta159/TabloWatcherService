@@ -11,6 +11,7 @@ import type { ChannelInfo } from '@/components/PosterGridPage'
 import { useDeviceChannels } from '@/hooks/useDeviceChannels'
 import { compareTitles } from '@/lib/format'
 import { isConflict, type AiringSchedule } from '@/lib/recording'
+import { withDevice } from '@/lib/device'
 
 type Kind = 'tv' | 'movie' | 'sport' | 'program'
 
@@ -118,7 +119,7 @@ function ScheduleRow({
         <div className="bg-muted flex aspect-[2/3] w-10 shrink-0 items-center justify-center overflow-hidden rounded">
           {posterId != null && !posterFailed ? (
             <img
-              src={`/api/images/${posterId}`}
+              src={withDevice(`/api/images/${posterId}`)}
               alt=""
               loading="lazy"
               className="h-full w-full object-cover"

@@ -125,6 +125,25 @@ for the plain list endpoint but add extra `[HttpGet]` actions that build their o
 via `ClientFactory.Create(ip, port)` directly, following the same error-handling pattern by
 hand. When adding a new proxied endpoint, follow whichever of these two shapes fits.
 
+### Multiple Tablo devices: everything is per device
+
+The UI's device tabs choose which Tablo every view shows, per browser tab:
+
+- **Backend:** `TabloDevice` holds one device's guide and recordings caches, channel list and
+  keyword recordings (`keyword-recordings.{server id}.json`); `TabloDeviceRegistry` creates
+  one per device. `TabloDeviceSelectionMiddleware` picks the device each `/api` request is for
+  (`X-Tablo-Device` header or `device` query parameter, else the first online device), and
+  `IAiringsStore`, `IRecordingsStore`, `IDeviceChannels`, `IKeywordRulesStore`,
+  `KeywordRecordingService` and `ICurrentTabloDeviceResolver` are registered per request from
+  it, so controllers just inject those. Background work (`PerDeviceRefreshService`) runs one
+  loop per online device. New per-device state belongs on `TabloDevice`, never in a singleton.
+  Which devices are online comes from `TabloDeviceDiscovery`, which probes each device
+  directly (the association server's `last_seen` is unreliable).
+- **Frontend:** `src/lib/device.ts` patches `fetch` to add the header to every `/api` request.
+  A URL the browser loads itself (`<img src>`, CSS `url()`, a link) can't carry a header, so
+  wrap it in `withDevice(...)`. `App` remounts `DeviceApp` when the device changes, so pages
+  never mix two devices' data.
+
 ### Frontend/backend integration
 
 - Dev: Vite (`vite.config.ts`) proxies `/api/*` to `http://localhost:5080` — no CORS needed

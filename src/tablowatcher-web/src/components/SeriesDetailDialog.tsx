@@ -10,6 +10,7 @@ import { Genres, Section } from '@/components/DetailDialogs'
 import { RecordButton, RecordingPill, ScheduleStatus } from '@/components/Recording'
 import { formatDuration, formatRating } from '@/lib/format'
 import { formatTimeRange, isScheduled, setScheduled, type RecordingState, type ScheduledAiring } from '@/lib/recording'
+import { withDevice } from '@/lib/device'
 
 // A show's recording rule and options (TvShowsController.RecordingOptions). Offsets are seconds.
 interface RecordingOptions {
@@ -161,7 +162,7 @@ export function SeriesDetailDialog({ path, onChanged }: { path: string; onChange
       <div className="col-span-1 min-h-0 overflow-y-auto border-r">
         <div
           className="bg-muted relative h-40 bg-cover bg-center"
-          style={backdrop ? { backgroundImage: `url(/api/images/${backdrop})` } : undefined}
+          style={backdrop ? { backgroundImage: `url(${withDevice(`/api/images/${backdrop}`)})` } : undefined}
         >
           <div className="from-popover via-popover/60 absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t to-transparent" />
         </div>

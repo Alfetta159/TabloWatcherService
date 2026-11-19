@@ -60,29 +60,28 @@ builder.Services.AddSingleton<ITabloDeviceClientFactory>(serviceProvider =>
 // Which Tablo devices are online: listed by the association server, confirmed by asking each
 // one directly (its last_seen there isn't a reliable liveness signal). Backs /api/servers.
 builder.Services.AddSingleton<ITabloDeviceDiscovery, TabloDeviceDiscovery>();
-// Resolves "the" Tablo device (the first online one) for features scoped to a single
-// device: the guide grid and its background images.
-builder.Services.AddSingleton<ICurrentTabloDeviceResolver, CurrentTabloDeviceResolver>();
-// Every channel list and dropdown reads the device's channels through this (cached briefly).
-builder.Services.AddSingleton<IDeviceChannels, DeviceChannels>();
 
-// Guide grid (channels x time): AiringsRefreshService periodically rebuilds this
-// in-memory store from the Tablo device; GuideGridController, SearchController and the
-// TV shows/movies/sports controllers just read it.
-builder.Services.AddSingleton<IAiringsStore, AiringsStore>();
+// Each Tablo has its own guide and recordings caches, channel list and keyword recordings (see
+// TabloDevice), kept current in the background for every online device. A request gets the
+// device the browser selected (TabloDeviceSelectionMiddleware) through the usual interfaces,
+// registered per request below - so controllers just ask for IAiringsStore etc. as before.
+builder.Services.AddSingleton<ITabloDeviceRegistry, TabloDeviceRegistry>();
+builder.Services.AddScoped<CurrentTabloDevice>();
+builder.Services.AddScoped<ICurrentTabloDeviceResolver, CurrentTabloDeviceResolver>();
+builder.Services.AddScoped(sp => sp.GetRequiredService<CurrentTabloDevice>().Device.Channels);
+builder.Services.AddScoped(sp => sp.GetRequiredService<CurrentTabloDevice>().Device.Airings);
+builder.Services.AddScoped(sp => sp.GetRequiredService<CurrentTabloDevice>().Device.Recordings);
+builder.Services.AddScoped(sp => sp.GetRequiredService<CurrentTabloDevice>().Device.KeywordRules);
+builder.Services.AddScoped(sp => sp.GetRequiredService<CurrentTabloDevice>().Device.KeywordRecordings);
+
+// Guide grid (channels x time), search and the upcoming lists; then keyword recordings.
 builder.Services.AddHostedService<AiringsRefreshService>();
-
-// Recordings page: RecordingsRefreshService keeps this in-memory cache of the device's
-// recordings current; RecordingsController just reads it.
-builder.Services.AddSingleton<IRecordingsStore, RecordingsStore>();
+// The Recordings page's cache.
 builder.Services.AddHostedService<RecordingsRefreshService>();
 
-// Genre tags blocked for everyone, persisted to a small JSON file (see BlockedTagsStore).
+// Genre tags blocked for everyone, on every device, persisted to a small JSON file (see
+// BlockedTagsStore).
 builder.Services.AddSingleton<IBlockedTagsStore, BlockedTagsStore>();
-
-// Keyword recordings, persisted the same way; AiringsRefreshService applies them after each refresh.
-builder.Services.AddSingleton<IKeywordRulesStore, KeywordRulesStore>();
-builder.Services.AddSingleton<KeywordRecordingService>();
 
 var app = builder.Build();
 
@@ -90,6 +89,9 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+// Before the controllers: picks the Tablo each /api request is for (see CurrentTabloDevice).
+app.UseMiddleware<TabloDeviceSelectionMiddleware>();
 
 app.MapControllers();
 

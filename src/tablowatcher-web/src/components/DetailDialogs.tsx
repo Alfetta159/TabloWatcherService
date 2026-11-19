@@ -6,6 +6,7 @@ import { AiringRow, RecordingPill } from '@/components/Recording'
 import type { ChannelInfo } from '@/components/PosterGridPage'
 import { formatDuration, formatRating, formatStars } from '@/lib/format'
 import { recordingStateOf, type AiringSchedule, type RecordingState, type ScheduledAiring } from '@/lib/recording'
+import { withDevice } from '@/lib/device'
 
 // GET /api/movies/{id}.
 interface MovieDetail {
@@ -48,7 +49,7 @@ export interface SportsEventDetail {
 }
 
 function imageUrl(id: number | null): string | null {
-  return id == null ? null : `/api/images/${id}`
+  return id == null ? null : withDevice(`/api/images/${id}`)
 }
 
 // The dialog's shared frame: backdrop across the top, poster overlapping it, title and

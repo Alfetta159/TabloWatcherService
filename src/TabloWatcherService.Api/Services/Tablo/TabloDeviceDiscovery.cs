@@ -20,7 +20,11 @@ public interface ITabloDeviceDiscovery
 /// fall back on - i.e. <paramref name="Devices"/> is empty because nothing is known, not
 /// because every device is offline.
 /// </param>
-public sealed record DeviceDiscoveryResult(IReadOnlyList<Recorder> Devices, IApiResponse? AssociationServerFailure = null);
+/// <param name="KnownDevices">Every device the association server lists, online or not, ordered by name.</param>
+public sealed record DeviceDiscoveryResult(
+    IReadOnlyList<Recorder> Devices,
+    IApiResponse? AssociationServerFailure = null,
+    IReadOnlyList<Recorder>? KnownDevices = null);
 
 public class TabloDeviceDiscovery(
     IAssociationServerClient associationServerClient,
@@ -127,7 +131,7 @@ public class TabloDeviceDiscovery(
             .ToArray();
 
         LogChanges(devices, online);
-        return new DeviceDiscoveryResult(online);
+        return new DeviceDiscoveryResult(online, KnownDevices: [.. devices.OrderBy(d => d.Name)]);
     }
 
     private async Task<(Recorder[]? Devices, IApiResponse? Failure)> GetKnownDevicesAsync()

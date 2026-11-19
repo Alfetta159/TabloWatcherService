@@ -28,7 +28,9 @@ public class StorageController(IRecordingsStore recordings, ICurrentTabloDeviceR
                 return LogFailure(response.ToErrorResult());
             }
 
-            return Ok(response.Content);
+            // An empty slot (nothing plugged in) isn't a drive - the Settings page then says
+            // "No hard drives connected".
+            return Ok(response.Content?.Where(d => d.Connected || d.Name is not null) ?? []);
         }
         catch (HttpRequestException)
         {
