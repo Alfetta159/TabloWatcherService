@@ -4,24 +4,18 @@ namespace TabloWatcherService.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ServersController(IAssociationServerClient associationServerClient) : LoggedControllerBase
+public class ServersController(ITabloDeviceDiscovery deviceDiscovery) : LoggedControllerBase
 {
-    private static readonly TimeSpan OnlineThreshold = TimeSpan.FromMinutes(5);
-
+    /// <summary>The Tablo devices that are online right now (see <see cref="ITabloDeviceDiscovery"/>).</summary>
     [HttpGet]
-    public async Task<IActionResult> Get()
+    public async Task<IActionResult> Get(CancellationToken cancellationToken)
     {
-        var response = await associationServerClient.GetRecordersAsync();
-        if (!response.IsSuccessful)
+        var result = await deviceDiscovery.GetOnlineDevicesAsync(cancellationToken);
+        if (result.AssociationServerFailure is { } failure)
         {
-            return LogFailure(response.ToErrorResult());
+            return LogFailure(failure.ToErrorResult());
         }
 
-        var activeRecorders = response.Content?.Recorders
-            .Where(r => !string.IsNullOrWhiteSpace(r.PrivateIp) && r.IsOnline(OnlineThreshold))
-            .OrderBy(r => r.Name)
-            .ToArray();
-
-        return Ok(activeRecorders ?? []);
+        return Ok(result.Devices);
     }
 }

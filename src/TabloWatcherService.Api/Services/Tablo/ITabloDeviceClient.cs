@@ -17,6 +17,11 @@ public interface ITabloDeviceClient
     [Get("/server/info")]
     Task<ApiResponse<ServerInfo>> GetServerInfoAsync();
 
+    // Same request, cancellable - TabloDeviceDiscovery uses it as a time-limited "are you
+    // there?" probe.
+    [Get("/server/info")]
+    Task<ApiResponse<ServerInfo>> GetServerInfoAsync(CancellationToken cancellationToken);
+
     [Get("/server/capabilities")]
     Task<ApiResponse<ServerCapabilities>> GetServerCapabilitiesAsync();
 

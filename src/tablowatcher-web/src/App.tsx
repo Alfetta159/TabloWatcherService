@@ -102,10 +102,15 @@ interface SelectedMovieInfo {
 // recordings have tuned.
 const TUNERS_POLL_INTERVAL_MS = 15_000
 
-// The server list and channel list are loaded once, but either can fail transiently (the
-// association server rate-limits with 429s, or the service is mid-restart) - retry at this
-// interval until they succeed, rather than leaving the guide without rows until a reload.
+// The server list and channel list can fail to load transiently (the association server
+// rate-limits with 429s, or the service is mid-restart) - retry at this interval until they
+// succeed, rather than leaving the guide without rows until a reload.
 const LOAD_RETRY_INTERVAL_MS = 5_000
+
+// How often to re-read the server list, so a Tablo that goes offline (or comes back) has its
+// tab removed (or added) without a reload. The backend drops a device the association server
+// hasn't heard from in 5 minutes; kept modest because the association server rate-limits.
+const SERVERS_POLL_INTERVAL_MS = 60_000
 
 // Records each tuner as now showing its channel. A channel's label only goes away when its
 // tuner is seen on a different channel - an idle tuner leaves the last label in place.
@@ -131,7 +136,7 @@ function App() {
     APP_VERSION !== undefined &&
     (serverVersion === 'missing' || (serverVersion !== null && serverVersion.version !== APP_VERSION))
   const navItems = hasListings === true ? NAV_ITEMS : NAV_ITEMS.filter((item) => !GUIDE_LISTING_NAV.has(item.label))
-  const [channels, setChannels] = useState<GuideChannel[]>([])
+  const [loadedChannels, setChannels] = useState<GuideChannel[]>([])
   const [channelsLoading, setChannelsLoading] = useState(false)
   const [channelsError, setChannelsError] = useState<string | null>(null)
   const [selectedProgram, setSelectedProgram] = useState<SelectedProgram | null>(null)
@@ -176,10 +181,16 @@ function App() {
         .then((data) => {
           if (cancelled) return
           setServers(data)
-          setSelectedServerId((current) => current || data[0]?.serverid || '')
+          // Keep the current tab while its device is still listed; otherwise fall back to the
+          // first one (or none), so a device that went offline doesn't stay selected.
+          setSelectedServerId((current) =>
+            data.some((s) => s.serverid === current) ? current : (data[0]?.serverid ?? ''),
+          )
+          retry = setTimeout(load, SERVERS_POLL_INTERVAL_MS)
         })
         .catch(() => {
           if (cancelled) return
+          // Keep showing the last known list; a failed poll isn't evidence a device is gone.
           retry = setTimeout(load, LOAD_RETRY_INTERVAL_MS)
         })
     }
@@ -192,15 +203,21 @@ function App() {
     }
   }, [])
 
+  // Keyed on the IP rather than the servers array, so each periodic re-poll of the server list
+  // doesn't reload the channel list when nothing about the selected device changed.
+  const selectedServerIp = servers.find((s) => s.serverid === selectedServerId)?.privateIp
+  // With no device left to select (they all went offline), don't keep showing the last one's
+  // channels.
+  const channels = selectedServerIp ? loadedChannels : []
+
   useEffect(() => {
     if (selectedNav !== 'Live TV') return
 
-    const server = servers.find((s) => s.serverid === selectedServerId)
-    if (!server) return
+    if (!selectedServerIp) return
 
     // server.http (from the association server's cached record) can be stale; 8885 is the
     // Tablo device's actual local-API port.
-    const query = `ip=${server.privateIp}&port=8885`
+    const query = `ip=${selectedServerIp}&port=8885`
     let cancelled = false
     let retry: ReturnType<typeof setTimeout> | undefined
     setChannelsLoading(true)
@@ -247,7 +264,7 @@ function App() {
       cancelled = true
       clearTimeout(retry)
     }
-  }, [selectedNav, selectedServerId, servers])
+  }, [selectedNav, selectedServerIp])
 
   useEffect(() => {
     const moviePath = selectedProgram?.moviePath
