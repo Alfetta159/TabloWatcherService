@@ -202,8 +202,10 @@ function RecordingCard({
             {title}
           </div>
         )}
-        <div className="absolute inset-x-2 top-2 flex items-center justify-between gap-2">
-          {extraPill && <div className="flex-1">{extraPill}</div>}
+        {/* Wraps, so when both pills don't fit side by side (e.g. "283 unwatched" and
+            "Recording" on a narrow card) the second drops below rather than off the edge. */}
+        <div className="absolute inset-x-2 top-2 flex flex-wrap items-start gap-1">
+          {extraPill}
           {pill && <div className="ml-auto">{pill}</div>}
         </div>
       </div>
