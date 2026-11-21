@@ -7,6 +7,7 @@ import { LivePlayer } from '@/components/LivePlayer'
 import type { ChannelInfo } from '@/components/PosterGridPage'
 import { postRecordingAction, resumePosition, startRecordingStream } from '@/lib/recording'
 import { formatClock, formatDuration, formatRating, formatSize, formatStars } from '@/lib/format'
+import { withDevice } from '@/lib/device'
 
 // GET /api/recordings/movies/{id} or /api/recordings/sports/{id}: the shared fields,
 // plus the movie's or the sports event's own.
@@ -217,7 +218,7 @@ export function RecordingPlayerDialog({
           <>
             {posterId != null && (
               <img
-                src={`/api/images/${posterId}`}
+                src={withDevice(`/api/images/${posterId}`)}
                 alt=""
                 className="aspect-[2/3] w-full max-w-56 rounded-lg object-cover shadow-md"
                 onError={() => setPosterFailed(true)}

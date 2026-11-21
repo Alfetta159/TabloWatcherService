@@ -1,9 +1,11 @@
+using System.Collections.Concurrent;
 using TabloWatcherService.Api.Models;
 
 namespace TabloWatcherService.Api.Services.Tablo;
 
 /// <summary>
-/// Keeps <see cref="IRecordingsStore"/> in step with the recordings on "the" Tablo device:
+/// Keeps each online Tablo's recordings cache (its <see cref="TabloDevice.Recordings"/>) in
+/// step with the recordings on the device:
 /// GET /recordings/airings for every recording's path, then /batch (see
 /// <see cref="TabloBatch"/>) to hydrate them and the series/movies/sports/programs they
 /// belong to.
@@ -15,54 +17,32 @@ namespace TabloWatcherService.Api.Services.Tablo;
 /// what that misses, like watched state and playback position changed by other Tablo apps.
 /// </summary>
 public class RecordingsRefreshService(
-    ICurrentTabloDeviceResolver deviceResolver,
-    IRecordingsStore store,
+    ITabloDeviceRegistry registry,
     IConfiguration configuration,
-    ILogger<RecordingsRefreshService> logger) : BackgroundService
+    ILogger<RecordingsRefreshService> logger) : PerDeviceRefreshService(registry, logger)
 {
     private static readonly TimeSpan FullRefreshInterval = TimeSpan.FromHours(1);
-    private static readonly TimeSpan FailedRefreshRetryInterval = TimeSpan.FromMinutes(1);
 
-    private DateTimeOffset _lastFullRefresh = DateTimeOffset.MinValue;
+    // By server id. Each device's loop only touches its own entry.
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastFullRefresh = new();
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override string What => "recordings";
+
+    protected override TimeSpan Interval =>
+        TimeSpan.FromMinutes(configuration.GetValue("Tablo:RecordingsRefreshIntervalMinutes", 15));
+
+    protected override async Task<bool> RefreshAsync(TabloDevice device, ITabloDeviceClient client, CancellationToken cancellationToken)
     {
-        var interval = TimeSpan.FromMinutes(configuration.GetValue("Tablo:RecordingsRefreshIntervalMinutes", 15));
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            var succeeded = false;
-            try
-            {
-                succeeded = await RefreshAsync(stoppingToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, "Failed to refresh recordings");
-            }
-
-            await Task.Delay(succeeded ? interval : FailedRefreshRetryInterval, stoppingToken);
-        }
-    }
-
-    private async Task<bool> RefreshAsync(CancellationToken cancellationToken)
-    {
-        var client = await deviceResolver.ResolveAsync();
-        if (client is null)
-        {
-            logger.LogWarning("Couldn't resolve a Tablo device; skipping recordings refresh");
-            return false;
-        }
-
+        var store = device.Recordings;
         var pathsResponse = await client.GetRecordedAiringsAsync();
         if (!pathsResponse.IsSuccessStatusCode || pathsResponse.Content is null)
         {
-            logger.LogWarning("Couldn't list recordings: {Status}", pathsResponse.StatusCode);
+            logger.LogWarning("Couldn't list recordings on {Device}: {Status}", device.Name, pathsResponse.StatusCode);
             return false;
         }
 
         var paths = pathsResponse.Content;
-        var full = DateTimeOffset.UtcNow - _lastFullRefresh >= FullRefreshInterval;
+        var full = DateTimeOffset.UtcNow - _lastFullRefresh.GetValueOrDefault(device.ServerId, DateTimeOffset.MinValue) >= FullRefreshInterval;
         var cached = full ? new Dictionary<string, RecordedAiring>() : store.Recordings;
 
         var toFetch = paths
@@ -83,11 +63,12 @@ public class RecordingsRefreshService(
 
         if (full && failedChunks == 0)
         {
-            _lastFullRefresh = DateTimeOffset.UtcNow;
+            _lastFullRefresh[device.ServerId] = DateTimeOffset.UtcNow;
         }
 
         logger.LogInformation(
-            "Refreshed recordings ({Mode}): {Count} recordings, {Fetched} fetched ({FailedChunks} chunk(s) failed after retries)",
+            "Refreshed recordings for {Device} ({Mode}): {Count} recordings, {Fetched} fetched ({FailedChunks} chunk(s) failed after retries)",
+            device.Name,
             full ? "full" : "incremental",
             recordings.Count,
             fetched.Count,

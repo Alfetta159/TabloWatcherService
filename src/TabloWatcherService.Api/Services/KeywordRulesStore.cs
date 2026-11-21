@@ -4,8 +4,9 @@ using TabloWatcherService.Api.Models;
 namespace TabloWatcherService.Api.Services;
 
 /// <summary>
-/// The saved keyword recordings (<see cref="KeywordRule"/>) and what each has handled - a
-/// global setting, like <see cref="IBlockedTagsStore"/>.
+/// One Tablo's saved keyword recordings (<see cref="KeywordRule"/>) and what each has handled.
+/// Unlike <see cref="IBlockedTagsStore"/> (one global setting), each device has its own, since
+/// each schedules against its own guide.
 /// </summary>
 public interface IKeywordRulesStore
 {
@@ -25,21 +26,35 @@ public interface IKeywordRulesStore
 }
 
 /// <summary>
-/// Persisted to a small JSON file next to the app (like blocked-tags.json), so keyword
-/// recordings - and which airings they've already scheduled - survive restarts and updates.
+/// Persisted to a small JSON file per device next to the app (keyword-recordings.{server id}.json,
+/// like blocked-tags.json), so keyword recordings - and which airings they've already scheduled -
+/// survive restarts and updates.
 /// </summary>
 public class KeywordRulesStore : IKeywordRulesStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    private readonly string _filePath;
+    private readonly string? _filePath;
     private readonly Lock _lock = new();
     private List<KeywordRule> _rules;
 
-    public KeywordRulesStore(IHostEnvironment environment)
+    /// <summary>
+    /// Where rules were kept before they were per device - see
+    /// TabloDeviceRegistry, which moves this file to the device it was scheduling on.
+    /// </summary>
+    public const string LegacyFileName = "keyword-recordings.json";
+
+    public static string FilePathFor(IHostEnvironment environment, string deviceId) =>
+        Path.Combine(environment.ContentRootPath, $"keyword-recordings.{deviceId}.json");
+
+    /// <param name="deviceId">
+    /// The Tablo whose rules these are (its server id). Null for the stand-in used while no
+    /// device is online: it starts empty and isn't saved anywhere.
+    /// </param>
+    public KeywordRulesStore(IHostEnvironment environment, string? deviceId)
     {
-        _filePath = Path.Combine(environment.ContentRootPath, "keyword-recordings.json");
-        _rules = Load(_filePath);
+        _filePath = deviceId is null ? null : FilePathFor(environment, deviceId);
+        _rules = _filePath is null ? [] : Load(_filePath);
     }
 
     public IReadOnlyList<KeywordRule> GetAll()
@@ -112,7 +127,13 @@ public class KeywordRulesStore : IKeywordRulesStore
     }
 
     // Callers hold _lock. Written whole each time - it's a handful of rules.
-    private void Save() => File.WriteAllText(_filePath, JsonSerializer.Serialize(_rules, JsonOptions));
+    private void Save()
+    {
+        if (_filePath is not null)
+        {
+            File.WriteAllText(_filePath, JsonSerializer.Serialize(_rules, JsonOptions));
+        }
+    }
 
     private static List<KeywordRule> Load(string filePath)
     {

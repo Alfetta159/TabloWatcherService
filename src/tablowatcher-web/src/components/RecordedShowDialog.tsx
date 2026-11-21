@@ -11,6 +11,7 @@ import { LivePlayer } from '@/components/LivePlayer'
 import type { ChannelInfo } from '@/components/PosterGridPage'
 import { formatClock, formatDuration, formatRating, formatSize } from '@/lib/format'
 import { postRecordingAction, resumePosition, startRecordingStream, updateRecording } from '@/lib/recording'
+import { withDevice } from '@/lib/device'
 
 // One recorded episode (or program airing).
 interface ShowRecording {
@@ -283,14 +284,14 @@ export function RecordedShowDialog({
       <div className="col-span-1 min-h-0 overflow-y-auto border-r">
         <div
           className="bg-muted relative h-40 bg-cover bg-center"
-          style={backdrop ? { backgroundImage: `url(/api/images/${backdrop})` } : undefined}
+          style={backdrop ? { backgroundImage: `url(${withDevice(`/api/images/${backdrop}`)})` } : undefined}
         >
           <div className="from-popover via-popover/60 absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t to-transparent" />
         </div>
         <div className="relative -mt-10 space-y-5 px-5 pb-5">
           {posterId != null && (
             <img
-              src={`/api/images/${posterId}`}
+              src={withDevice(`/api/images/${posterId}`)}
               alt=""
               className="aspect-[2/3] w-32 rounded-lg object-cover shadow-md"
               onError={() => setPosterFailed(true)}

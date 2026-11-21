@@ -1,31 +1,32 @@
 namespace TabloWatcherService.Api.Services.Tablo;
 
 /// <summary>
-/// Resolves a client for "the" Tablo device - the first online one, by name. Used by features
-/// scoped to a single device (the guide grid and its images), mirroring how the frontend
-/// picks a default server before the user chooses otherwise.
+/// Resolves a client for "the" Tablo device. In an HTTP request that's the device the browser
+/// selected (see <see cref="CurrentTabloDevice"/>); inside a device's own services (its channel
+/// list, keyword recordings) it's always that device (<see cref="FixedTabloDeviceResolver"/>).
 /// </summary>
 public interface ICurrentTabloDeviceResolver
 {
     Task<ITabloDeviceClient?> ResolveAsync();
 }
 
-public class CurrentTabloDeviceResolver(
-    ITabloDeviceDiscovery deviceDiscovery,
-    ITabloDeviceClientFactory clientFactory,
-    ILogger<CurrentTabloDeviceResolver> logger) : ICurrentTabloDeviceResolver
+/// <summary>The selected device for the current request; registered per request.</summary>
+public class CurrentTabloDeviceResolver(CurrentTabloDevice current, ILogger<CurrentTabloDeviceResolver> logger) : ICurrentTabloDeviceResolver
 {
-    // Discovery caches its answer briefly, so the dozens of resolves behind a page of posters
-    // don't each re-probe the devices or hit the association server's rate limit.
-    public async Task<ITabloDeviceClient?> ResolveAsync()
+    public Task<ITabloDeviceClient?> ResolveAsync()
     {
-        var device = (await deviceDiscovery.GetOnlineDevicesAsync()).Devices.FirstOrDefault();
-        if (device is null)
+        var client = current.Device.CreateClient();
+        if (client is null)
         {
             logger.LogWarning("No Tablo device is online");
-            return null;
         }
 
-        return clientFactory.Create(device.PrivateIp, TabloDeviceDiscovery.DevicePort);
+        return Task.FromResult(client);
     }
+}
+
+/// <summary>Always the same device - for the services that belong to one (see <see cref="TabloDevice"/>).</summary>
+public class FixedTabloDeviceResolver(Func<ITabloDeviceClient?> createClient) : ICurrentTabloDeviceResolver
+{
+    public Task<ITabloDeviceClient?> ResolveAsync() => Task.FromResult(createClient());
 }

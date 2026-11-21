@@ -59,14 +59,18 @@ public partial class AiringsStore : IAiringsStore
 
     private readonly string? _devCachePath;
 
-    public AiringsStore(IHostEnvironment environment)
+    /// <param name="deviceId">
+    /// The Tablo this store holds the guide of (its server id) - names its dev cache file. Null
+    /// for a store that never holds data (no device online), which has no cache file.
+    /// </param>
+    public AiringsStore(IHostEnvironment environment, string? deviceId)
     {
-        if (!environment.IsDevelopment())
+        if (!environment.IsDevelopment() || deviceId is null)
         {
             return;
         }
 
-        _devCachePath = Path.Combine(environment.ContentRootPath, "dev-guide-cache.json");
+        _devCachePath = Path.Combine(environment.ContentRootPath, $"dev-guide-cache.{deviceId}.json");
         if (DevCache.Load<CachedGuide>(_devCachePath) is { } cached)
         {
             BuildSnapshot(cached.Airings, cached.Details);
